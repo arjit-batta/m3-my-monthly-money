@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { format } from 'date-fns';
 import { CalendarIcon, IndianRupee } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -19,7 +19,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { Label } from '@/components/ui/label';
-import { Category, PaymentMode } from '@/types/expense';
+import { PaymentMode } from '@/types/expense';
 import { getCategories, addExpense, generateId } from '@/lib/storage';
 import { useToast } from '@/hooks/use-toast';
 
@@ -31,19 +31,54 @@ const PAYMENT_MODES: { value: PaymentMode; label: string }[] = [
   { value: 'wallet', label: 'Wallet' },
 ];
 
+const STORAGE_KEYS = {
+  LAST_CATEGORY: 'expense-last-category',
+  LAST_PAYMENT_MODE: 'expense-last-payment-mode',
+};
+
+function getLastUsedValues() {
+  return {
+    categoryId: localStorage.getItem(STORAGE_KEYS.LAST_CATEGORY) || '',
+    paymentMode: (localStorage.getItem(STORAGE_KEYS.LAST_PAYMENT_MODE) || '') as PaymentMode | '',
+  };
+}
+
+function saveLastUsedValues(categoryId: string, paymentMode: PaymentMode) {
+  localStorage.setItem(STORAGE_KEYS.LAST_CATEGORY, categoryId);
+  localStorage.setItem(STORAGE_KEYS.LAST_PAYMENT_MODE, paymentMode);
+}
+
 export function ExpenseForm() {
   const { toast } = useToast();
+  const amountInputRef = useRef<HTMLInputElement>(null);
   const categories = useMemo(() => getCategories(), []);
+  const lastUsed = useMemo(() => getLastUsedValues(), []);
 
   const [amount, setAmount] = useState('');
+  const [amountTouched, setAmountTouched] = useState(false);
   const [date, setDate] = useState<Date>(new Date());
-  const [categoryId, setCategoryId] = useState('');
+  const [categoryId, setCategoryId] = useState(lastUsed.categoryId);
+  const [categoryTouched, setCategoryTouched] = useState(false);
   const [subCategoryId, setSubCategoryId] = useState('');
-  const [paymentMode, setPaymentMode] = useState<PaymentMode | ''>('');
+  const [subCategoryTouched, setSubCategoryTouched] = useState(false);
+  const [paymentMode, setPaymentMode] = useState<PaymentMode | ''>(lastUsed.paymentMode);
+  const [paymentModeTouched, setPaymentModeTouched] = useState(false);
   const [notes, setNotes] = useState('');
+
+  // Auto-focus amount input on mount
+  useEffect(() => {
+    amountInputRef.current?.focus();
+  }, []);
 
   const selectedCategory = categories.find((c) => c.id === categoryId);
   const subCategories = selectedCategory?.subCategories || [];
+
+  // Validation
+  const amountNum = parseFloat(amount);
+  const amountError = amountTouched && (isNaN(amountNum) || amountNum <= 0) ? 'Amount must be greater than 0' : '';
+  const categoryError = categoryTouched && !categoryId ? 'Category is required' : '';
+  const subCategoryError = subCategoryTouched && !subCategoryId ? 'Sub-category is required' : '';
+  const paymentModeError = paymentModeTouched && !paymentMode ? 'Payment mode is required' : '';
 
   const isFormValid = useMemo(() => {
     const amountNum = parseFloat(amount);
@@ -58,10 +93,18 @@ export function ExpenseForm() {
 
   const handleCategoryChange = (value: string) => {
     setCategoryId(value);
+    setCategoryTouched(true);
     setSubCategoryId(''); // Reset sub-category when category changes
+    setSubCategoryTouched(false);
   };
 
   const handleSubmit = () => {
+    // Touch all fields to show errors
+    setAmountTouched(true);
+    setCategoryTouched(true);
+    setSubCategoryTouched(true);
+    setPaymentModeTouched(true);
+
     if (!isFormValid) return;
 
     const expense = {
@@ -76,19 +119,23 @@ export function ExpenseForm() {
     };
 
     addExpense(expense);
+    saveLastUsedValues(categoryId, paymentMode as PaymentMode);
 
     toast({
       title: 'Expense added',
       description: `₹${amount} recorded successfully`,
     });
 
-    // Reset form
+    // Reset form but keep category and payment mode
     setAmount('');
+    setAmountTouched(false);
     setDate(new Date());
-    setCategoryId('');
     setSubCategoryId('');
-    setPaymentMode('');
+    setSubCategoryTouched(false);
     setNotes('');
+
+    // Refocus amount input
+    amountInputRef.current?.focus();
   };
 
   return (
@@ -99,15 +146,18 @@ export function ExpenseForm() {
         <div className="relative">
           <IndianRupee className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
+            ref={amountInputRef}
             id="amount"
             type="number"
             inputMode="decimal"
             placeholder="0.00"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            className="pl-9 text-lg font-medium"
+            onBlur={() => setAmountTouched(true)}
+            className={cn('pl-9 text-lg font-medium', amountError && 'border-destructive')}
           />
         </div>
+        {amountError && <p className="text-sm text-destructive">{amountError}</p>}
       </div>
 
       {/* Date Picker */}
@@ -142,7 +192,7 @@ export function ExpenseForm() {
       <div className="space-y-2">
         <Label>Category</Label>
         <Select value={categoryId} onValueChange={handleCategoryChange}>
-          <SelectTrigger>
+          <SelectTrigger className={cn(categoryError && 'border-destructive')}>
             <SelectValue placeholder="Select category" />
           </SelectTrigger>
           <SelectContent>
@@ -156,6 +206,7 @@ export function ExpenseForm() {
             ))}
           </SelectContent>
         </Select>
+        {categoryError && <p className="text-sm text-destructive">{categoryError}</p>}
       </div>
 
       {/* Sub-category */}
@@ -163,10 +214,13 @@ export function ExpenseForm() {
         <Label>Sub-category</Label>
         <Select
           value={subCategoryId}
-          onValueChange={setSubCategoryId}
+          onValueChange={(v) => {
+            setSubCategoryId(v);
+            setSubCategoryTouched(true);
+          }}
           disabled={!categoryId}
         >
-          <SelectTrigger className={!categoryId ? 'opacity-50' : ''}>
+          <SelectTrigger className={cn(!categoryId && 'opacity-50', subCategoryError && 'border-destructive')}>
             <SelectValue
               placeholder={
                 categoryId ? 'Select sub-category' : 'Select category first'
@@ -181,6 +235,7 @@ export function ExpenseForm() {
             ))}
           </SelectContent>
         </Select>
+        {subCategoryError && <p className="text-sm text-destructive">{subCategoryError}</p>}
       </div>
 
       {/* Payment Mode */}
@@ -188,9 +243,12 @@ export function ExpenseForm() {
         <Label>Payment Mode</Label>
         <Select
           value={paymentMode}
-          onValueChange={(v) => setPaymentMode(v as PaymentMode)}
+          onValueChange={(v) => {
+            setPaymentMode(v as PaymentMode);
+            setPaymentModeTouched(true);
+          }}
         >
-          <SelectTrigger>
+          <SelectTrigger className={cn(paymentModeError && 'border-destructive')}>
             <SelectValue placeholder="Select payment mode" />
           </SelectTrigger>
           <SelectContent>
@@ -201,6 +259,7 @@ export function ExpenseForm() {
             ))}
           </SelectContent>
         </Select>
+        {paymentModeError && <p className="text-sm text-destructive">{paymentModeError}</p>}
       </div>
 
       {/* Notes */}
