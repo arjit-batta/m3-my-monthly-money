@@ -1,12 +1,14 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, Pencil } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
+import { Button } from '@/components/ui/button';
 import { CategorySpending } from '@/types/expense';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 interface BudgetCardProps {
   category: CategorySpending;
+  onEditBudget?: (categoryId: string, subCategoryId: string, currentAmount: number) => void;
 }
 
 function formatCurrency(amount: number): string {
@@ -18,7 +20,7 @@ function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
-export function BudgetCard({ category }: BudgetCardProps) {
+export function BudgetCard({ category, onEditBudget }: BudgetCardProps) {
   const [isOpen, setIsOpen] = useState(false);
   const isOverBudget = category.remaining < 0;
   const hasSubsWithBudget = category.subCategories.some((sc) => sc.budget > 0);
@@ -67,7 +69,7 @@ export function BudgetCard({ category }: BudgetCardProps) {
               return (
                 <div key={sub.subCategoryId} className="flex items-center justify-between">
                   <span className="text-sm">{sub.subCategoryName}</span>
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
                     <div className="text-right">
                       <span className="text-sm font-medium">{formatCurrency(sub.spent)}</span>
                       {sub.budget > 0 && (
@@ -77,19 +79,30 @@ export function BudgetCard({ category }: BudgetCardProps) {
                       )}
                     </div>
                     {sub.budget > 0 && (
-                      <div className="w-16">
+                      <div className="w-12">
                         <Progress
                           value={Math.min(sub.percentage, 100)}
                           className={cn('h-1.5', subOverBudget && '[&>div]:bg-destructive')}
                         />
                       </div>
                     )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEditBudget?.(category.categoryId, sub.subCategoryId, sub.budget);
+                      }}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
                 </div>
               );
             })}
             {!hasSubsWithBudget && (
-              <p className="text-sm text-muted-foreground italic">No budgets set for this category</p>
+              <p className="text-sm text-muted-foreground italic">No budgets set. Tap the pencil icon to add one.</p>
             )}
           </div>
         </CollapsibleContent>

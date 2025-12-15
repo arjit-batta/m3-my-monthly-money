@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { format } from 'date-fns';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { AppLayout } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
 import { BudgetCard } from '@/components/BudgetCard';
+import { BudgetEditor } from '@/components/BudgetEditor';
 import { useBudgetData } from '@/hooks/useBudgetData';
 
 function formatCurrency(amount: number): string {
@@ -19,8 +20,15 @@ export default function Budgets() {
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  const { categories, totalBudget, totalSpent, remaining } = useBudgetData(month, year);
+  // Editor state
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editCategoryId, setEditCategoryId] = useState('');
+  const [editSubCategoryId, setEditSubCategoryId] = useState('');
+  const [editAmount, setEditAmount] = useState(0);
+
+  const { categories, totalBudget, totalSpent, remaining } = useBudgetData(month, year, refreshKey);
 
   const goToPrevMonth = () => {
     if (month === 1) {
@@ -38,6 +46,24 @@ export default function Budgets() {
     } else {
       setMonth(month + 1);
     }
+  };
+
+  const handleAddBudget = () => {
+    setEditCategoryId('');
+    setEditSubCategoryId('');
+    setEditAmount(0);
+    setEditorOpen(true);
+  };
+
+  const handleEditBudget = useCallback((categoryId: string, subCategoryId: string, currentAmount: number) => {
+    setEditCategoryId(categoryId);
+    setEditSubCategoryId(subCategoryId);
+    setEditAmount(currentAmount);
+    setEditorOpen(true);
+  }, []);
+
+  const handleBudgetSaved = () => {
+    setRefreshKey((k) => k + 1);
   };
 
   const monthLabel = format(new Date(year, month - 1), 'MMMM yyyy');
@@ -80,10 +106,20 @@ export default function Budgets() {
           </div>
         </div>
 
+        {/* Add budget button */}
+        <Button onClick={handleAddBudget} className="w-full" variant="outline">
+          <Plus className="mr-2 h-4 w-4" />
+          Add Budget
+        </Button>
+
         {/* Category cards */}
         <div className="space-y-3">
           {categories.map((category) => (
-            <BudgetCard key={category.categoryId} category={category} />
+            <BudgetCard
+              key={`${category.categoryId}-${refreshKey}`}
+              category={category}
+              onEditBudget={handleEditBudget}
+            />
           ))}
         </div>
 
@@ -91,6 +127,17 @@ export default function Budgets() {
           <p className="text-center text-muted-foreground">No categories found</p>
         )}
       </div>
+
+      <BudgetEditor
+        open={editorOpen}
+        onOpenChange={setEditorOpen}
+        month={month}
+        year={year}
+        initialCategoryId={editCategoryId}
+        initialSubCategoryId={editSubCategoryId}
+        initialAmount={editAmount}
+        onSave={handleBudgetSaved}
+      />
     </AppLayout>
   );
 }

@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { getCategories, getExpenses, getBudgets } from '@/lib/storage';
 import { CategorySpending, SubCategorySpending } from '@/types/expense';
 
-export function useBudgetData(month: number, year: number) {
+export function useBudgetData(month: number, year: number, refreshKey: number = 0) {
   return useMemo(() => {
     const categories = getCategories();
     const expenses = getExpenses();
@@ -72,5 +72,5 @@ export function useBudgetData(month: number, year: number) {
       totalSpent,
       remaining: totalBudget - totalSpent,
     };
-  }, [month, year]);
+  }, [month, year, refreshKey]);
 }
