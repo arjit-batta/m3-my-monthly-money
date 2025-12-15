@@ -73,23 +73,25 @@ export function ExpenseForm() {
   const selectedCategory = categories.find((c) => c.id === categoryId);
   const subCategories = selectedCategory?.subCategories || [];
 
-  // Validation
+  // Validation - sub-category only required if category has sub-categories
+  const hasSubCategories = subCategories.length > 0;
   const amountNum = parseFloat(amount);
   const amountError = amountTouched && (isNaN(amountNum) || amountNum <= 0) ? 'Amount must be greater than 0' : '';
   const categoryError = categoryTouched && !categoryId ? 'Category is required' : '';
-  const subCategoryError = subCategoryTouched && !subCategoryId ? 'Sub-category is required' : '';
+  const subCategoryError = subCategoryTouched && hasSubCategories && !subCategoryId ? 'Sub-category is required' : '';
   const paymentModeError = paymentModeTouched && !paymentMode ? 'Payment mode is required' : '';
 
   const isFormValid = useMemo(() => {
     const amountNum = parseFloat(amount);
+    const subCategoryValid = !hasSubCategories || subCategoryId !== '';
     return (
       amountNum > 0 &&
       date &&
       categoryId !== '' &&
-      subCategoryId !== '' &&
+      subCategoryValid &&
       paymentMode !== ''
     );
-  }, [amount, date, categoryId, subCategoryId, paymentMode]);
+  }, [amount, date, categoryId, subCategoryId, paymentMode, hasSubCategories]);
 
   const handleCategoryChange = (value: string) => {
     setCategoryId(value);
@@ -211,33 +213,33 @@ export function ExpenseForm() {
       </div>
 
       {/* Sub-category */}
-      <div className="space-y-2">
-        <Label>Sub-category</Label>
-        <Select
-          value={subCategoryId}
-          onValueChange={(v) => {
-            setSubCategoryId(v);
-            setSubCategoryTouched(true);
-          }}
-          disabled={!categoryId}
-        >
-          <SelectTrigger className={cn(!categoryId && 'opacity-50', subCategoryError && 'border-destructive')}>
-            <SelectValue
-              placeholder={
-                categoryId ? 'Select sub-category' : 'Select category first'
-              }
-            />
-          </SelectTrigger>
-          <SelectContent>
-            {subCategories.map((sub) => (
-              <SelectItem key={sub.id} value={sub.id}>
-                {sub.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {subCategoryError && <p className="text-sm text-destructive">{subCategoryError}</p>}
-      </div>
+      {categoryId && hasSubCategories && (
+        <div className="space-y-2">
+          <Label>Sub-category</Label>
+          <Select
+            value={subCategoryId}
+            onValueChange={(v) => {
+              setSubCategoryId(v);
+              setSubCategoryTouched(true);
+            }}
+          >
+            <SelectTrigger className={cn(subCategoryError && 'border-destructive')}>
+              <SelectValue placeholder="Select sub-category" />
+            </SelectTrigger>
+            <SelectContent>
+              {subCategories.map((sub) => (
+                <SelectItem key={sub.id} value={sub.id}>
+                  {sub.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {subCategoryError && <p className="text-sm text-destructive">{subCategoryError}</p>}
+        </div>
+      )}
+      {categoryId && !hasSubCategories && (
+        <p className="text-sm text-muted-foreground">No sub-categories defined for this category</p>
+      )}
 
       {/* Payment Mode */}
       <div className="space-y-2">
