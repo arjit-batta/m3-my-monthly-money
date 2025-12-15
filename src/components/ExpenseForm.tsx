@@ -114,7 +114,7 @@ export function ExpenseForm() {
       amount: parseFloat(amount),
       date: format(date, 'yyyy-MM-dd'),
       categoryId,
-      subCategoryId,
+      subCategoryId: subCategoryId || undefined,
       paymentMode: paymentMode as PaymentMode,
       notes: notes.trim() || undefined,
       createdAt: new Date().toISOString(),
