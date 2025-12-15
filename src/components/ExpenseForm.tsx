@@ -122,8 +122,9 @@ export function ExpenseForm() {
     saveLastUsedValues(categoryId, paymentMode as PaymentMode);
 
     toast({
-      title: 'Expense added',
-      description: `₹${amount} recorded successfully`,
+      title: 'Expense saved',
+      description: `₹${amount} added`,
+      duration: 2000,
     });
 
     // Reset form but keep category and payment mode
