@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { AppLayout } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useBudgetData } from '@/hooks/useBudgetData';
+
+const COLORS = ['#2563eb', '#16a34a', '#ea580c', '#8b5cf6', '#ec4899', '#14b8a6', '#f59e0b', '#6366f1'];
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-IN', {
@@ -27,7 +30,7 @@ export default function Analytics() {
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
 
-  const { totalBudget, totalSpent, remaining } = useBudgetData(month, year);
+  const { categories, totalBudget, totalSpent, remaining } = useBudgetData(month, year);
 
   const goToPrevMonth = () => {
     if (month === 1) {
@@ -49,7 +52,17 @@ export default function Analytics() {
 
   const monthLabel = format(new Date(year, month - 1), 'MMMM yyyy');
   const percentage = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
-  const isOverBudget = remaining < 0;
+
+  // Prepare chart data - only categories with spending
+  const chartData = categories
+    .filter((c) => c.totalSpent > 0)
+    .map((c, index) => ({
+      name: c.categoryName,
+      value: c.totalSpent,
+      icon: c.icon,
+      color: COLORS[index % COLORS.length],
+    }))
+    .sort((a, b) => b.value - a.value);
 
   return (
     <AppLayout>
@@ -69,39 +82,80 @@ export default function Analytics() {
         </div>
 
         {/* Summary Cards */}
-        <div className="grid gap-4">
+        <div className="grid grid-cols-3 gap-3">
           <Card>
-            <CardContent className="pt-6">
-              <p className="text-sm text-muted-foreground">Total Expenses</p>
-              <p className="text-2xl font-bold">{formatCurrency(totalSpent)}</p>
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground">Spent</p>
+              <p className="text-lg font-bold">{formatCurrency(totalSpent)}</p>
             </CardContent>
           </Card>
 
           <Card>
-            <CardContent className="pt-6">
-              <p className="text-sm text-muted-foreground">Total Budget</p>
-              <p className="text-2xl font-bold">{formatCurrency(totalBudget)}</p>
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground">Budget</p>
+              <p className="text-lg font-bold">{formatCurrency(totalBudget)}</p>
             </CardContent>
           </Card>
 
           <Card>
-            <CardContent className="pt-6">
-              <p className="text-sm text-muted-foreground">Remaining</p>
-              <p className={`text-2xl font-bold ${getStatusColor(percentage, totalBudget > 0)}`}>
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground">Left</p>
+              <p className={`text-lg font-bold ${getStatusColor(percentage, totalBudget > 0)}`}>
                 {formatCurrency(remaining)}
               </p>
-              {totalBudget > 0 && (
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {percentage.toFixed(0)}% of budget used
-                </p>
-              )}
             </CardContent>
           </Card>
         </div>
 
-        {totalBudget === 0 && (
+        {/* Pie Chart */}
+        {chartData.length > 0 && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Spending by Category</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[200px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={chartData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={80}
+                      paddingAngle={2}
+                      dataKey="value"
+                    >
+                      {chartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Legend */}
+              <div className="mt-4 space-y-2">
+                {chartData.map((item, index) => (
+                  <div key={index} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="h-3 w-3 rounded-full"
+                        style={{ backgroundColor: item.color }}
+                      />
+                      <span className="text-sm">{item.icon} {item.name}</span>
+                    </div>
+                    <span className="text-sm font-medium">{formatCurrency(item.value)}</span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {totalSpent === 0 && (
           <p className="text-center text-sm text-muted-foreground">
-            No budgets set for this month. Add budgets to track your spending.
+            No expenses recorded for this month.
           </p>
         )}
       </div>
