@@ -153,9 +153,63 @@ export default function Analytics() {
           </Card>
         )}
 
-        {totalSpent === 0 && (
+        {/* Budget vs Spent Comparison */}
+        {categories.some((c) => c.totalBudget > 0 || c.totalSpent > 0) && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Budget vs Spent</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {categories
+                .filter((c) => c.totalBudget > 0 || c.totalSpent > 0)
+                .map((category) => {
+                  const isOver = category.totalSpent > category.totalBudget && category.totalBudget > 0;
+                  const barMax = Math.max(category.totalBudget, category.totalSpent);
+                  const budgetWidth = barMax > 0 ? (category.totalBudget / barMax) * 100 : 0;
+                  const spentWidth = barMax > 0 ? (category.totalSpent / barMax) * 100 : 0;
+
+                  return (
+                    <div key={category.categoryId} className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">
+                          {category.icon} {category.categoryName}
+                        </span>
+                        {isOver && (
+                          <span className="text-xs font-medium text-destructive">
+                            Over by {formatCurrency(category.totalSpent - category.totalBudget)}
+                          </span>
+                        )}
+                      </div>
+                      <div className="relative h-6 rounded-md bg-muted">
+                        {/* Budget bar (background) */}
+                        {category.totalBudget > 0 && (
+                          <div
+                            className="absolute inset-y-0 left-0 rounded-md bg-primary/20"
+                            style={{ width: `${budgetWidth}%` }}
+                          />
+                        )}
+                        {/* Spent bar (foreground) */}
+                        <div
+                          className={`absolute inset-y-0 left-0 rounded-md transition-all ${
+                            isOver ? 'bg-destructive' : category.percentage >= 75 ? 'bg-orange-500' : 'bg-green-600'
+                          }`}
+                          style={{ width: `${spentWidth}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>Spent: {formatCurrency(category.totalSpent)}</span>
+                        <span>Budget: {formatCurrency(category.totalBudget)}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+            </CardContent>
+          </Card>
+        )}
+
+        {totalSpent === 0 && totalBudget === 0 && (
           <p className="text-center text-sm text-muted-foreground">
-            No expenses recorded for this month.
+            No expenses or budgets recorded for this month.
           </p>
         )}
       </div>
