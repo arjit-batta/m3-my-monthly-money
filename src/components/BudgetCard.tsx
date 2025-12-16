@@ -20,9 +20,21 @@ function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
+function getStatusColor(percentage: number, hasBudget: boolean): string {
+  if (!hasBudget) return '';
+  if (percentage >= 100) return 'text-destructive';
+  if (percentage >= 75) return 'text-orange-500';
+  return 'text-green-600';
+}
+
+function getProgressColor(percentage: number): string {
+  if (percentage >= 100) return '[&>div]:bg-destructive';
+  if (percentage >= 75) return '[&>div]:bg-orange-500';
+  return '[&>div]:bg-green-600';
+}
+
 export function BudgetCard({ category, onEditBudget }: BudgetCardProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const isOverBudget = category.remaining < 0;
   const hasSubsWithBudget = category.subCategories.some((sc) => sc.budget > 0);
 
   return (
@@ -42,7 +54,7 @@ export function BudgetCard({ category, onEditBudget }: BudgetCardProps) {
             <div className="text-right">
               <p className="font-semibold">{formatCurrency(category.totalSpent)}</p>
               {category.totalBudget > 0 && (
-                <p className={cn('text-sm', isOverBudget ? 'text-destructive' : 'text-muted-foreground')}>
+                <p className={cn('text-sm', getStatusColor(category.percentage, true) || 'text-muted-foreground')}>
                   of {formatCurrency(category.totalBudget)}
                 </p>
               )}
@@ -58,22 +70,20 @@ export function BudgetCard({ category, onEditBudget }: BudgetCardProps) {
         {category.totalBudget > 0 && (
           <Progress
             value={Math.min(category.percentage, 100)}
-            className={cn('mt-3 h-2', isOverBudget && '[&>div]:bg-destructive')}
+            className={cn('mt-3 h-2', getProgressColor(category.percentage))}
           />
         )}
 
         <CollapsibleContent>
           <div className="mt-4 space-y-3 border-t pt-4">
-            {category.subCategories.map((sub) => {
-              const subOverBudget = sub.remaining < 0;
-              return (
+            {category.subCategories.map((sub) => (
                 <div key={sub.subCategoryId} className="flex items-center justify-between">
                   <span className="text-sm">{sub.subCategoryName}</span>
                   <div className="flex items-center gap-2">
                     <div className="text-right">
                       <span className="text-sm font-medium">{formatCurrency(sub.spent)}</span>
                       {sub.budget > 0 && (
-                        <span className={cn('text-sm', subOverBudget ? 'text-destructive' : 'text-muted-foreground')}>
+                        <span className={cn('text-sm', getStatusColor(sub.percentage, true) || 'text-muted-foreground')}>
                           {' '}/ {formatCurrency(sub.budget)}
                         </span>
                       )}
@@ -82,7 +92,7 @@ export function BudgetCard({ category, onEditBudget }: BudgetCardProps) {
                       <div className="w-12">
                         <Progress
                           value={Math.min(sub.percentage, 100)}
-                          className={cn('h-1.5', subOverBudget && '[&>div]:bg-destructive')}
+                          className={cn('h-1.5', getProgressColor(sub.percentage))}
                         />
                       </div>
                     )}
@@ -99,8 +109,8 @@ export function BudgetCard({ category, onEditBudget }: BudgetCardProps) {
                     </Button>
                   </div>
                 </div>
-              );
-            })}
+              )
+            )}
             {!hasSubsWithBudget && (
               <p className="text-sm text-muted-foreground italic">No budgets set. Tap the pencil icon to add one.</p>
             )}
