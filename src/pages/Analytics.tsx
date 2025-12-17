@@ -1,14 +1,27 @@
 import { useState, useMemo } from 'react';
-import { format, startOfWeek, endOfWeek, eachDayOfInterval, eachWeekOfInterval, startOfMonth, endOfMonth, isSameDay, isWithinInterval } from 'date-fns';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { format, startOfWeek, endOfWeek, eachDayOfInterval, eachWeekOfInterval, startOfMonth, endOfMonth, isSameDay, isWithinInterval, parseISO } from 'date-fns';
+import { ChevronLeft, ChevronRight, Filter, X } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { AppLayout } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 import { useBudgetData } from '@/hooks/useBudgetData';
-import { getExpenses } from '@/lib/storage';
+import { getExpenses, getCategories } from '@/lib/storage';
+import { PaymentMode } from '@/types/expense';
+import { cn } from '@/lib/utils';
 
 const COLORS = ['#2563eb', '#16a34a', '#ea580c', '#8b5cf6', '#ec4899', '#14b8a6', '#f59e0b', '#6366f1'];
+
+const PAYMENT_MODES: { value: PaymentMode; label: string }[] = [
+  { value: 'cash', label: 'Cash' },
+  { value: 'upi', label: 'UPI' },
+  { value: 'card', label: 'Card' },
+  { value: 'netbanking', label: 'Net Banking' },
+  { value: 'wallet', label: 'Wallet' },
+];
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-IN', {
@@ -33,8 +46,15 @@ export default function Analytics() {
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
   const [trendView, setTrendView] = useState<TrendView>('daily');
+  
+  // Filter states
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedPaymentMode, setSelectedPaymentMode] = useState<string>('all');
+  const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({});
+  const [showFilters, setShowFilters] = useState(false);
 
-  const { categories, totalBudget, totalSpent, remaining } = useBudgetData(month, year);
+  const allCategories = getCategories();
+  const { categories: budgetCategories, totalBudget } = useBudgetData(month, year);
 
   const goToPrevMonth = () => {
     if (month === 1) {
@@ -43,6 +63,8 @@ export default function Analytics() {
     } else {
       setMonth(month - 1);
     }
+    // Reset date range when month changes
+    setDateRange({});
   };
 
   const goToNextMonth = () => {
@@ -52,37 +74,79 @@ export default function Analytics() {
     } else {
       setMonth(month + 1);
     }
+    // Reset date range when month changes
+    setDateRange({});
   };
 
   const monthLabel = format(new Date(year, month - 1), 'MMMM yyyy');
+  const monthStart = startOfMonth(new Date(year, month - 1));
+  const monthEnd = endOfMonth(new Date(year, month - 1));
+
+  // Get filtered expenses
+  const filteredExpenses = useMemo(() => {
+    const expenses = getExpenses();
+    
+    return expenses.filter((e) => {
+      const expenseDate = parseISO(e.date);
+      
+      // Month filter (always applied)
+      if (!isWithinInterval(expenseDate, { start: monthStart, end: monthEnd })) {
+        return false;
+      }
+      
+      // Category filter
+      if (selectedCategory !== 'all' && e.categoryId !== selectedCategory) {
+        return false;
+      }
+      
+      // Payment mode filter
+      if (selectedPaymentMode !== 'all' && e.paymentMode !== selectedPaymentMode) {
+        return false;
+      }
+      
+      // Date range filter
+      if (dateRange.from && expenseDate < dateRange.from) {
+        return false;
+      }
+      if (dateRange.to && expenseDate > dateRange.to) {
+        return false;
+      }
+      
+      return true;
+    });
+  }, [month, year, selectedCategory, selectedPaymentMode, dateRange, monthStart, monthEnd]);
+
+  const totalSpent = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
+  const remaining = totalBudget - totalSpent;
   const percentage = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
 
-  // Prepare chart data - only categories with spending
-  const chartData = categories
-    .filter((c) => c.totalSpent > 0)
-    .map((c, index) => ({
-      name: c.categoryName,
-      value: c.totalSpent,
-      icon: c.icon,
-      color: COLORS[index % COLORS.length],
-    }))
-    .sort((a, b) => b.value - a.value);
+  // Prepare chart data - grouped by category
+  const chartData = useMemo(() => {
+    const categoryTotals: Record<string, number> = {};
+    
+    filteredExpenses.forEach((e) => {
+      categoryTotals[e.categoryId] = (categoryTotals[e.categoryId] || 0) + e.amount;
+    });
+
+    return Object.entries(categoryTotals)
+      .map(([categoryId, value], index) => {
+        const category = allCategories.find((c) => c.id === categoryId);
+        return {
+          name: category?.name || 'Unknown',
+          value,
+          icon: category?.icon || '📦',
+          color: COLORS[index % COLORS.length],
+        };
+      })
+      .sort((a, b) => b.value - a.value);
+  }, [filteredExpenses, allCategories]);
 
   // Expense trends data
   const trendData = useMemo(() => {
-    const expenses = getExpenses();
-    const monthStart = startOfMonth(new Date(year, month - 1));
-    const monthEnd = endOfMonth(new Date(year, month - 1));
-
-    const monthExpenses = expenses.filter((e) => {
-      const expenseDate = new Date(e.date);
-      return isWithinInterval(expenseDate, { start: monthStart, end: monthEnd });
-    });
-
     if (trendView === 'daily') {
       const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
       return days.map((day) => {
-        const dayExpenses = monthExpenses.filter((e) => isSameDay(new Date(e.date), day));
+        const dayExpenses = filteredExpenses.filter((e) => isSameDay(parseISO(e.date), day));
         const total = dayExpenses.reduce((sum, e) => sum + e.amount, 0);
         return {
           label: format(day, 'd'),
@@ -93,8 +157,8 @@ export default function Analytics() {
       const weeks = eachWeekOfInterval({ start: monthStart, end: monthEnd }, { weekStartsOn: 1 });
       return weeks.map((weekStart, index) => {
         const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
-        const weekExpenses = monthExpenses.filter((e) => {
-          const expenseDate = new Date(e.date);
+        const weekExpenses = filteredExpenses.filter((e) => {
+          const expenseDate = parseISO(e.date);
           return isWithinInterval(expenseDate, { start: weekStart, end: weekEnd });
         });
         const total = weekExpenses.reduce((sum, e) => sum + e.amount, 0);
@@ -104,11 +168,40 @@ export default function Analytics() {
         };
       });
     }
-  }, [month, year, trendView]);
+  }, [filteredExpenses, trendView, monthStart, monthEnd]);
+
+  // Budget vs Spent data (filtered by category if selected)
+  const budgetComparisonData = useMemo(() => {
+    if (selectedCategory !== 'all') {
+      const cat = budgetCategories.find((c) => c.categoryId === selectedCategory);
+      if (cat) {
+        return [{
+          ...cat,
+          totalSpent: filteredExpenses.reduce((sum, e) => sum + e.amount, 0),
+        }];
+      }
+      return [];
+    }
+    
+    return budgetCategories.map((cat) => ({
+      ...cat,
+      totalSpent: filteredExpenses
+        .filter((e) => e.categoryId === cat.categoryId)
+        .reduce((sum, e) => sum + e.amount, 0),
+    }));
+  }, [budgetCategories, filteredExpenses, selectedCategory]);
+
+  const hasActiveFilters = selectedCategory !== 'all' || selectedPaymentMode !== 'all' || dateRange.from || dateRange.to;
+
+  const clearFilters = () => {
+    setSelectedCategory('all');
+    setSelectedPaymentMode('all');
+    setDateRange({});
+  };
 
   return (
     <AppLayout>
-      <div className="space-y-6 pb-6">
+      <div className="space-y-4 pb-6">
         {/* Header with month navigation */}
         <div className="flex items-center justify-between pt-6">
           <h1 className="text-xl font-semibold">Analytics</h1>
@@ -120,6 +213,132 @@ export default function Analytics() {
             <Button variant="ghost" size="icon" onClick={goToNextMonth}>
               <ChevronRight className="h-5 w-5" />
             </Button>
+          </div>
+        </div>
+
+        {/* Filter Toggle */}
+        <div className="flex items-center gap-2">
+          <Button 
+            variant={showFilters ? 'default' : 'outline'} 
+            size="sm" 
+            onClick={() => setShowFilters(!showFilters)}
+            className="gap-2"
+          >
+            <Filter className="h-4 w-4" />
+            Filters
+            {hasActiveFilters && (
+              <span className="ml-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary-foreground text-xs text-primary">
+                {[selectedCategory !== 'all', selectedPaymentMode !== 'all', dateRange.from || dateRange.to].filter(Boolean).length}
+              </span>
+            )}
+          </Button>
+          {hasActiveFilters && (
+            <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-1 text-muted-foreground">
+              <X className="h-4 w-4" />
+              Clear
+            </Button>
+          )}
+        </div>
+
+        {/* Filters Panel */}
+        {showFilters && (
+          <Card>
+            <CardContent className="grid gap-3 p-4 sm:grid-cols-3">
+              {/* Category Filter */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Category</label>
+                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="All categories" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover">
+                    <SelectItem value="all">All categories</SelectItem>
+                    {allCategories.map((cat) => (
+                      <SelectItem key={cat.id} value={cat.id}>
+                        {cat.icon} {cat.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Payment Mode Filter */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Payment Mode</label>
+                <Select value={selectedPaymentMode} onValueChange={setSelectedPaymentMode}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="All modes" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover">
+                    <SelectItem value="all">All modes</SelectItem>
+                    {PAYMENT_MODES.map((mode) => (
+                      <SelectItem key={mode.value} value={mode.value}>
+                        {mode.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Date Range Filter */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Date Range</label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="h-9 w-full justify-start text-left font-normal">
+                      {dateRange.from ? (
+                        dateRange.to ? (
+                          <span className="text-xs">
+                            {format(dateRange.from, 'd MMM')} - {format(dateRange.to, 'd MMM')}
+                          </span>
+                        ) : (
+                          <span className="text-xs">From {format(dateRange.from, 'd MMM')}</span>
+                        )
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Select dates</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0 bg-popover" align="start">
+                    <Calendar
+                      mode="range"
+                      selected={{ from: dateRange.from, to: dateRange.to }}
+                      onSelect={(range) => setDateRange({ from: range?.from, to: range?.to })}
+                      defaultMonth={new Date(year, month - 1)}
+                      disabled={(date) => date < monthStart || date > monthEnd}
+                      className={cn("p-3 pointer-events-auto")}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Summary Cards */}
+        <div className="grid grid-cols-3 gap-3">
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground">Spent</p>
+              <p className="text-lg font-bold">{formatCurrency(totalSpent)}</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground">Budget</p>
+              <p className="text-lg font-bold">{formatCurrency(totalBudget)}</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground">Left</p>
+              <p className={`text-lg font-bold ${getStatusColor(percentage, totalBudget > 0)}`}>
+                {formatCurrency(remaining)}
+              </p>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Expense Trends */}
@@ -187,33 +406,6 @@ export default function Analytics() {
             </CardContent>
           </Card>
         )}
-        </div>
-
-        {/* Summary Cards */}
-        <div className="grid grid-cols-3 gap-3">
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground">Spent</p>
-              <p className="text-lg font-bold">{formatCurrency(totalSpent)}</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground">Budget</p>
-              <p className="text-lg font-bold">{formatCurrency(totalBudget)}</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground">Left</p>
-              <p className={`text-lg font-bold ${getStatusColor(percentage, totalBudget > 0)}`}>
-                {formatCurrency(remaining)}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
 
         {/* Pie Chart */}
         {chartData.length > 0 && (
@@ -262,19 +454,20 @@ export default function Analytics() {
         )}
 
         {/* Budget vs Spent Comparison */}
-        {categories.some((c) => c.totalBudget > 0 || c.totalSpent > 0) && (
+        {budgetComparisonData.some((c) => c.totalBudget > 0 || c.totalSpent > 0) && (
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Budget vs Spent</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {categories
+              {budgetComparisonData
                 .filter((c) => c.totalBudget > 0 || c.totalSpent > 0)
                 .map((category) => {
                   const isOver = category.totalSpent > category.totalBudget && category.totalBudget > 0;
                   const barMax = Math.max(category.totalBudget, category.totalSpent);
                   const budgetWidth = barMax > 0 ? (category.totalBudget / barMax) * 100 : 0;
                   const spentWidth = barMax > 0 ? (category.totalSpent / barMax) * 100 : 0;
+                  const spentPercentage = category.totalBudget > 0 ? (category.totalSpent / category.totalBudget) * 100 : 0;
 
                   return (
                     <div key={category.categoryId} className="space-y-1">
@@ -299,7 +492,7 @@ export default function Analytics() {
                         {/* Spent bar (foreground) */}
                         <div
                           className={`absolute inset-y-0 left-0 rounded-md transition-all ${
-                            isOver ? 'bg-destructive' : category.percentage >= 75 ? 'bg-orange-500' : 'bg-green-600'
+                            isOver ? 'bg-destructive' : spentPercentage >= 75 ? 'bg-orange-500' : 'bg-green-600'
                           }`}
                           style={{ width: `${spentWidth}%` }}
                         />
