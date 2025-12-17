@@ -1,11 +1,12 @@
-import { useState } from 'react';
-import { format } from 'date-fns';
+import { useState, useMemo } from 'react';
+import { format, startOfWeek, endOfWeek, eachDayOfInterval, eachWeekOfInterval, startOfMonth, endOfMonth, isSameDay, isWithinInterval } from 'date-fns';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { AppLayout } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useBudgetData } from '@/hooks/useBudgetData';
+import { getExpenses } from '@/lib/storage';
 
 const COLORS = ['#2563eb', '#16a34a', '#ea580c', '#8b5cf6', '#ec4899', '#14b8a6', '#f59e0b', '#6366f1'];
 
@@ -25,10 +26,13 @@ function getStatusColor(percentage: number, hasBudget: boolean): string {
   return 'text-green-600';
 }
 
+type TrendView = 'daily' | 'weekly';
+
 export default function Analytics() {
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
+  const [trendView, setTrendView] = useState<TrendView>('daily');
 
   const { categories, totalBudget, totalSpent, remaining } = useBudgetData(month, year);
 
@@ -64,6 +68,44 @@ export default function Analytics() {
     }))
     .sort((a, b) => b.value - a.value);
 
+  // Expense trends data
+  const trendData = useMemo(() => {
+    const expenses = getExpenses();
+    const monthStart = startOfMonth(new Date(year, month - 1));
+    const monthEnd = endOfMonth(new Date(year, month - 1));
+
+    const monthExpenses = expenses.filter((e) => {
+      const expenseDate = new Date(e.date);
+      return isWithinInterval(expenseDate, { start: monthStart, end: monthEnd });
+    });
+
+    if (trendView === 'daily') {
+      const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
+      return days.map((day) => {
+        const dayExpenses = monthExpenses.filter((e) => isSameDay(new Date(e.date), day));
+        const total = dayExpenses.reduce((sum, e) => sum + e.amount, 0);
+        return {
+          label: format(day, 'd'),
+          amount: total,
+        };
+      });
+    } else {
+      const weeks = eachWeekOfInterval({ start: monthStart, end: monthEnd }, { weekStartsOn: 1 });
+      return weeks.map((weekStart, index) => {
+        const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
+        const weekExpenses = monthExpenses.filter((e) => {
+          const expenseDate = new Date(e.date);
+          return isWithinInterval(expenseDate, { start: weekStart, end: weekEnd });
+        });
+        const total = weekExpenses.reduce((sum, e) => sum + e.amount, 0);
+        return {
+          label: `W${index + 1}`,
+          amount: total,
+        };
+      });
+    }
+  }, [month, year, trendView]);
+
   return (
     <AppLayout>
       <div className="space-y-6 pb-6">
@@ -78,7 +120,73 @@ export default function Analytics() {
             <Button variant="ghost" size="icon" onClick={goToNextMonth}>
               <ChevronRight className="h-5 w-5" />
             </Button>
-          </div>
+        </div>
+
+        {/* Expense Trends */}
+        {trendData.some((d) => d.amount > 0) && (
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base">Expense Trends</CardTitle>
+                <div className="flex gap-1">
+                  <Button
+                    variant={trendView === 'daily' ? 'default' : 'outline'}
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={() => setTrendView('daily')}
+                  >
+                    Daily
+                  </Button>
+                  <Button
+                    variant={trendView === 'weekly' ? 'default' : 'outline'}
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={() => setTrendView('weekly')}
+                  >
+                    Weekly
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[180px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={trendData}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                    <XAxis 
+                      dataKey="label" 
+                      tick={{ fontSize: 10 }} 
+                      tickLine={false} 
+                      axisLine={false}
+                      interval={trendView === 'daily' ? 4 : 0}
+                    />
+                    <YAxis 
+                      tick={{ fontSize: 10 }} 
+                      tickLine={false} 
+                      axisLine={false}
+                      tickFormatter={(value) => `₹${(value / 1000).toFixed(0)}k`}
+                      width={40}
+                    />
+                    <Tooltip 
+                      formatter={(value: number) => [formatCurrency(value), 'Spent']}
+                      contentStyle={{ 
+                        backgroundColor: 'hsl(var(--card))', 
+                        borderColor: 'hsl(var(--border))',
+                        borderRadius: '8px',
+                        fontSize: '12px'
+                      }}
+                    />
+                    <Bar 
+                      dataKey="amount" 
+                      fill="hsl(var(--primary))" 
+                      radius={[4, 4, 0, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        )}
         </div>
 
         {/* Summary Cards */}
