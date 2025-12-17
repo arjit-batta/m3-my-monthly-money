@@ -126,6 +126,15 @@ export function deleteExpense(expenseId: string): boolean {
   return true;
 }
 
+export function updateExpense(expenseId: string, updates: Partial<Expense>): boolean {
+  const expenses = getExpenses();
+  const index = expenses.findIndex(e => e.id === expenseId);
+  if (index === -1) return false;
+  expenses[index] = { ...expenses[index], ...updates };
+  saveExpenses(expenses);
+  return true;
+}
+
 // Budgets
 export function getBudgets(): Budget[] {
   const stored = localStorage.getItem(STORAGE_KEYS.BUDGETS);

@@ -1,9 +1,28 @@
-import { useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { format, parseISO } from 'date-fns';
+import { Trash2 } from 'lucide-react';
 import { AppLayout } from '@/components/AppLayout';
 import { Card, CardContent } from '@/components/ui/card';
-import { getExpenses, getCategories } from '@/lib/storage';
-import { Expense, Category } from '@/types/expense';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { getExpenses, getCategories, deleteExpense, updateExpense } from '@/lib/storage';
+import { Expense, Category, PaymentMode } from '@/types/expense';
+import { toast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
+
+const PAYMENT_MODES: { value: PaymentMode; label: string }[] = [
+  { value: 'cash', label: 'Cash' },
+  { value: 'upi', label: 'UPI' },
+  { value: 'card', label: 'Card' },
+  { value: 'netbanking', label: 'Net Banking' },
+  { value: 'wallet', label: 'Wallet' },
+];
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-IN', {
@@ -26,8 +45,11 @@ function getPaymentModeLabel(mode: string): string {
 }
 
 export default function SettingsPage() {
-  const expenses = getExpenses();
-  const categories = getCategories();
+  const [expenses, setExpenses] = useState(getExpenses);
+  const [categories] = useState(getCategories);
+  const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
+  const [editForm, setEditForm] = useState<Partial<Expense>>({});
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
 
   const categoryMap = useMemo(() => {
     const map: Record<string, Category> = {};
@@ -50,6 +72,64 @@ export default function SettingsPage() {
     if (!category) return '';
     const subCat = category.subCategories.find((sc) => sc.id === expense.subCategoryId);
     return subCat?.name || '';
+  };
+
+  const selectedCategory = editForm.categoryId ? categoryMap[editForm.categoryId] : null;
+  const subCategories = selectedCategory?.subCategories || [];
+
+  const openEditSheet = (expense: Expense) => {
+    setSelectedExpense(expense);
+    setEditForm({
+      amount: expense.amount,
+      date: expense.date,
+      categoryId: expense.categoryId,
+      subCategoryId: expense.subCategoryId,
+      paymentMode: expense.paymentMode,
+      notes: expense.notes,
+    });
+    setIsSheetOpen(true);
+  };
+
+  const handleSave = () => {
+    if (!selectedExpense) return;
+    
+    if (!editForm.amount || editForm.amount <= 0) {
+      toast({ title: 'Amount must be greater than 0', variant: 'destructive' });
+      return;
+    }
+    if (!editForm.categoryId) {
+      toast({ title: 'Please select a category', variant: 'destructive' });
+      return;
+    }
+    if (!editForm.subCategoryId) {
+      toast({ title: 'Please select a sub-category', variant: 'destructive' });
+      return;
+    }
+
+    const success = updateExpense(selectedExpense.id, editForm);
+    if (success) {
+      setExpenses(getExpenses());
+      setIsSheetOpen(false);
+      toast({ title: 'Transaction updated' });
+    }
+  };
+
+  const handleDelete = (expenseId: string) => {
+    const success = deleteExpense(expenseId);
+    if (success) {
+      setExpenses(getExpenses());
+      setIsSheetOpen(false);
+      toast({ title: 'Transaction deleted' });
+    }
+  };
+
+  const handleCategoryChange = (categoryId: string) => {
+    const category = categoryMap[categoryId];
+    setEditForm({
+      ...editForm,
+      categoryId,
+      subCategoryId: category?.subCategories[0]?.id || '',
+    });
   };
 
   return (
@@ -76,7 +156,11 @@ export default function SettingsPage() {
               const subCategoryName = getSubCategoryName(expense);
 
               return (
-                <Card key={expense.id}>
+                <Card 
+                  key={expense.id} 
+                  className="cursor-pointer transition-colors hover:bg-muted/50"
+                  onClick={() => openEditSheet(expense)}
+                >
                   <CardContent className="flex items-center justify-between p-4">
                     <div className="flex items-center gap-3">
                       <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-lg">
@@ -103,6 +187,148 @@ export default function SettingsPage() {
           </div>
         )}
       </div>
+
+      {/* Edit Sheet */}
+      <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+        <SheetContent side="bottom" className="h-[85vh] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Edit Transaction</SheetTitle>
+          </SheetHeader>
+
+          <div className="mt-6 space-y-4">
+            {/* Amount */}
+            <div className="space-y-2">
+              <Label>Amount (₹)</Label>
+              <Input
+                type="number"
+                value={editForm.amount || ''}
+                onChange={(e) => setEditForm({ ...editForm, amount: parseFloat(e.target.value) || 0 })}
+                placeholder="0"
+              />
+            </div>
+
+            {/* Date */}
+            <div className="space-y-2">
+              <Label>Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full justify-start text-left font-normal">
+                    {editForm.date ? format(parseISO(editForm.date), 'd MMM yyyy') : 'Select date'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0 bg-popover" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={editForm.date ? parseISO(editForm.date) : undefined}
+                    onSelect={(date) => date && setEditForm({ ...editForm, date: format(date, 'yyyy-MM-dd') })}
+                    className={cn("p-3 pointer-events-auto")}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            {/* Category */}
+            <div className="space-y-2">
+              <Label>Category</Label>
+              <Select value={editForm.categoryId || ''} onValueChange={handleCategoryChange}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent className="bg-popover">
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      {cat.icon} {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Sub-category */}
+            <div className="space-y-2">
+              <Label>Sub-category</Label>
+              <Select 
+                value={editForm.subCategoryId || ''} 
+                onValueChange={(v) => setEditForm({ ...editForm, subCategoryId: v })}
+                disabled={subCategories.length === 0}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select sub-category" />
+                </SelectTrigger>
+                <SelectContent className="bg-popover">
+                  {subCategories.map((sub) => (
+                    <SelectItem key={sub.id} value={sub.id}>
+                      {sub.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Payment Mode */}
+            <div className="space-y-2">
+              <Label>Payment Mode</Label>
+              <Select 
+                value={editForm.paymentMode || ''} 
+                onValueChange={(v) => setEditForm({ ...editForm, paymentMode: v as PaymentMode })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select payment mode" />
+                </SelectTrigger>
+                <SelectContent className="bg-popover">
+                  {PAYMENT_MODES.map((mode) => (
+                    <SelectItem key={mode.value} value={mode.value}>
+                      {mode.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Notes */}
+            <div className="space-y-2">
+              <Label>Notes (optional)</Label>
+              <Input
+                value={editForm.notes || ''}
+                onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                placeholder="Add notes"
+              />
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3 pt-4">
+              <Button onClick={handleSave} className="flex-1">
+                Save Changes
+              </Button>
+              
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" size="icon">
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete Transaction?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will permanently delete this transaction. This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction 
+                      onClick={() => selectedExpense && handleDelete(selectedExpense.id)}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
     </AppLayout>
   );
 }
