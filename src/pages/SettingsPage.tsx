@@ -11,10 +11,12 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { getExpenses, getCategories, deleteExpense, updateExpense } from '@/lib/storage';
 import { Expense, Category, PaymentMode } from '@/types/expense';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { CategoryManager } from '@/components/CategoryManager';
 
 const PAYMENT_MODES: { value: PaymentMode; label: string }[] = [
   { value: 'cash', label: 'Cash' },
@@ -46,7 +48,7 @@ function getPaymentModeLabel(mode: string): string {
 
 export default function SettingsPage() {
   const [expenses, setExpenses] = useState(getExpenses);
-  const [categories] = useState(getCategories);
+  const [categories, setCategories] = useState(getCategories);
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [editForm, setEditForm] = useState<Partial<Expense>>({});
   const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -132,60 +134,78 @@ export default function SettingsPage() {
     });
   };
 
+  const refreshCategories = () => {
+    setCategories(getCategories());
+  };
+
   return (
     <AppLayout>
       <div className="space-y-4 pb-6">
         <div className="pt-6">
-          <h1 className="text-xl font-semibold">Transactions</h1>
-          <p className="text-sm text-muted-foreground">
-            {sortedExpenses.length} expense{sortedExpenses.length !== 1 ? 's' : ''} recorded
-          </p>
+          <h1 className="text-xl font-semibold">Settings</h1>
         </div>
 
-        {sortedExpenses.length === 0 ? (
-          <Card>
-            <CardContent className="py-8 text-center">
-              <p className="text-muted-foreground">No transactions yet</p>
-              <p className="text-sm text-muted-foreground">Add your first expense to see it here</p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-2">
-            {sortedExpenses.map((expense) => {
-              const category = categoryMap[expense.categoryId];
-              const subCategoryName = getSubCategoryName(expense);
+        <Tabs defaultValue="transactions" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="transactions">Transactions</TabsTrigger>
+            <TabsTrigger value="categories" onClick={refreshCategories}>Categories</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="transactions" className="mt-4">
+            <p className="text-sm text-muted-foreground mb-4">
+              {sortedExpenses.length} expense{sortedExpenses.length !== 1 ? 's' : ''} recorded
+            </p>
 
-              return (
-                <Card 
-                  key={expense.id} 
-                  className="cursor-pointer transition-colors hover:bg-muted/50"
-                  onClick={() => openEditSheet(expense)}
-                >
-                  <CardContent className="flex items-center justify-between p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-lg">
-                        {category?.icon || '📦'}
-                      </div>
-                      <div>
-                        <p className="font-medium">{category?.name || 'Unknown'}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {subCategoryName && `${subCategoryName} · `}
-                          {getPaymentModeLabel(expense.paymentMode)}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-semibold">{formatCurrency(expense.amount)}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {format(parseISO(expense.date), 'd MMM yyyy')}
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        )}
+            {sortedExpenses.length === 0 ? (
+              <Card>
+                <CardContent className="py-8 text-center">
+                  <p className="text-muted-foreground">No transactions yet</p>
+                  <p className="text-sm text-muted-foreground">Add your first expense to see it here</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-2">
+                {sortedExpenses.map((expense) => {
+                  const category = categoryMap[expense.categoryId];
+                  const subCategoryName = getSubCategoryName(expense);
+
+                  return (
+                    <Card 
+                      key={expense.id} 
+                      className="cursor-pointer transition-colors hover:bg-muted/50"
+                      onClick={() => openEditSheet(expense)}
+                    >
+                      <CardContent className="flex items-center justify-between p-4">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-lg">
+                            {category?.icon || '📦'}
+                          </div>
+                          <div>
+                            <p className="font-medium">{category?.name || 'Unknown'}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {subCategoryName && `${subCategoryName} · `}
+                              {getPaymentModeLabel(expense.paymentMode)}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-semibold">{formatCurrency(expense.amount)}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {format(parseISO(expense.date), 'd MMM yyyy')}
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="categories" className="mt-4">
+            <CategoryManager />
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Edit Sheet */}
