@@ -54,23 +54,26 @@ export function CategoryManager() {
     setExpandedCategories(newExpanded);
   };
 
-  // Check if sub-category has dependencies
-  const hasSubCategoryDependencies = (categoryId: string, subCategoryId: string): boolean => {
+  // Get dependency counts for sub-category
+  const getSubCategoryDependencies = (categoryId: string, subCategoryId: string) => {
     const expenses = getExpenses();
     const budgets = getBudgets();
     
-    const hasExpenses = expenses.some(e => e.categoryId === categoryId && e.subCategoryId === subCategoryId);
-    const hasBudgets = budgets.some(b => b.categoryId === categoryId && b.subCategoryId === subCategoryId);
+    const expenseCount = expenses.filter(e => e.categoryId === categoryId && e.subCategoryId === subCategoryId).length;
+    const budgetCount = budgets.filter(b => b.categoryId === categoryId && b.subCategoryId === subCategoryId).length;
     
-    return hasExpenses || hasBudgets;
+    return { expenseCount, budgetCount, hasAny: expenseCount > 0 || budgetCount > 0 };
   };
 
-  // Check if category has dependencies (any expenses or budgets)
-  const hasCategoryDependencies = (categoryId: string): boolean => {
+  // Get dependency counts for category
+  const getCategoryDependencies = (categoryId: string) => {
     const expenses = getExpenses();
     const budgets = getBudgets();
     
-    return expenses.some(e => e.categoryId === categoryId) || budgets.some(b => b.categoryId === categoryId);
+    const expenseCount = expenses.filter(e => e.categoryId === categoryId).length;
+    const budgetCount = budgets.filter(b => b.categoryId === categoryId).length;
+    
+    return { expenseCount, budgetCount, hasAny: expenseCount > 0 || budgetCount > 0 };
   };
 
   // Category handlers
@@ -115,8 +118,9 @@ export function CategoryManager() {
   const handleDeleteCategory = () => {
     if (!deleteDialog || deleteDialog.type !== 'category') return;
     
-    if (hasCategoryDependencies(deleteDialog.categoryId)) {
-      toast({ title: 'Cannot delete', description: 'This category has expenses or budgets', variant: 'destructive' });
+    const deps = getCategoryDependencies(deleteDialog.categoryId);
+    if (deps.hasAny) {
+      toast({ title: 'Cannot delete', description: `This category has ${deps.expenseCount} expense(s) and ${deps.budgetCount} budget(s)`, variant: 'destructive' });
       setDeleteDialog(null);
       return;
     }
@@ -168,8 +172,9 @@ export function CategoryManager() {
       return;
     }
 
-    if (hasSubCategoryDependencies(deleteDialog.categoryId, deleteDialog.subId)) {
-      toast({ title: 'Cannot delete', description: 'This sub-category has expenses or budgets', variant: 'destructive' });
+    const deps = getSubCategoryDependencies(deleteDialog.categoryId, deleteDialog.subId);
+    if (deps.hasAny) {
+      toast({ title: 'Cannot delete', description: `This sub-category has ${deps.expenseCount} expense(s) and ${deps.budgetCount} budget(s)`, variant: 'destructive' });
       setDeleteDialog(null);
       return;
     }
@@ -355,10 +360,44 @@ export function CategoryManager() {
             <AlertDialogTitle>
               Delete {deleteDialog?.type === 'category' ? 'Category' : 'Sub-category'}?
             </AlertDialogTitle>
-            <AlertDialogDescription>
-              {deleteDialog?.type === 'category' 
-                ? 'This will delete the category and all its sub-categories. This action cannot be undone.'
-                : 'This will delete the sub-category. This action cannot be undone.'}
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                {deleteDialog?.type === 'category' ? (
+                  <>
+                    <p>This will delete the category and all its sub-categories.</p>
+                    {deleteDialog && (() => {
+                      const deps = getCategoryDependencies(deleteDialog.categoryId);
+                      if (deps.hasAny) {
+                        return (
+                          <p className="text-destructive font-medium">
+                            ⚠️ Cannot delete: {deps.expenseCount} expense(s) and {deps.budgetCount} budget(s) exist for this category.
+                          </p>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </>
+                ) : (
+                  <>
+                    <p>This will delete the sub-category.</p>
+                    {deleteDialog?.subId && (() => {
+                      const category = categories.find(c => c.id === deleteDialog.categoryId);
+                      if (category && category.subCategories.length <= 1) {
+                        return <p className="text-destructive font-medium">⚠️ Cannot delete: Category must have at least one sub-category.</p>;
+                      }
+                      const deps = getSubCategoryDependencies(deleteDialog.categoryId, deleteDialog.subId);
+                      if (deps.hasAny) {
+                        return (
+                          <p className="text-destructive font-medium">
+                            ⚠️ Cannot delete: {deps.expenseCount} expense(s) and {deps.budgetCount} budget(s) exist.
+                          </p>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </>
+                )}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
