@@ -1,10 +1,12 @@
-import { Category, Expense, Budget } from '@/types/expense';
+import { Category, Expense, Budget, PaymentMode } from '@/types/expense';
 import { DEFAULT_CATEGORIES, validateCategory } from '@/data/defaultCategories';
+import { DEFAULT_PAYMENT_MODES } from '@/data/defaultPaymentModes';
 
 export const STORAGE_KEYS = {
   EXPENSES: 'expense-manager-expenses',
   BUDGETS: 'expense-manager-budgets',
   CATEGORIES: 'expense-manager-categories',
+  PAYMENT_MODES: 'expense-manager-payment-modes',
 } as const;
 
 // Categories
@@ -165,6 +167,44 @@ export function deleteBudget(budgetId: string): boolean {
   const filtered = budgets.filter(b => b.id !== budgetId);
   if (filtered.length === budgets.length) return false;
   saveBudgets(filtered);
+  return true;
+}
+
+// Payment Modes
+export function getPaymentModes(): PaymentMode[] {
+  const stored = localStorage.getItem(STORAGE_KEYS.PAYMENT_MODES);
+  if (stored) {
+    return JSON.parse(stored) as PaymentMode[];
+  }
+  // Initialize with defaults on first load
+  localStorage.setItem(STORAGE_KEYS.PAYMENT_MODES, JSON.stringify(DEFAULT_PAYMENT_MODES));
+  return DEFAULT_PAYMENT_MODES;
+}
+
+export function savePaymentModes(modes: PaymentMode[]): void {
+  localStorage.setItem(STORAGE_KEYS.PAYMENT_MODES, JSON.stringify(modes));
+}
+
+export function addPaymentMode(mode: PaymentMode): void {
+  const modes = getPaymentModes();
+  modes.push(mode);
+  savePaymentModes(modes);
+}
+
+export function updatePaymentMode(modeId: string, updates: Partial<PaymentMode>): boolean {
+  const modes = getPaymentModes();
+  const index = modes.findIndex(m => m.id === modeId);
+  if (index === -1) return false;
+  modes[index] = { ...modes[index], ...updates };
+  savePaymentModes(modes);
+  return true;
+}
+
+export function deletePaymentMode(modeId: string): boolean {
+  const modes = getPaymentModes();
+  const filtered = modes.filter(m => m.id !== modeId);
+  if (filtered.length === modes.length) return false;
+  savePaymentModes(filtered);
   return true;
 }
 

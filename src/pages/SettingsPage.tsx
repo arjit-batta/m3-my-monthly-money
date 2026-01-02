@@ -12,19 +12,12 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { getExpenses, getCategories, deleteExpense, updateExpense } from '@/lib/storage';
-import { Expense, Category, PaymentMode } from '@/types/expense';
+import { getExpenses, getCategories, getPaymentModes, deleteExpense, updateExpense } from '@/lib/storage';
+import { Expense, Category } from '@/types/expense';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { CategoryManager } from '@/components/CategoryManager';
-
-const PAYMENT_MODES: { value: PaymentMode; label: string }[] = [
-  { value: 'cash', label: 'Cash' },
-  { value: 'upi', label: 'UPI' },
-  { value: 'card', label: 'Card' },
-  { value: 'netbanking', label: 'Net Banking' },
-  { value: 'wallet', label: 'Wallet' },
-];
+import { PaymentModeManager } from '@/components/PaymentModeManager';
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-IN', {
@@ -35,20 +28,10 @@ function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
-function getPaymentModeLabel(mode: string): string {
-  const labels: Record<string, string> = {
-    cash: 'Cash',
-    upi: 'UPI',
-    card: 'Card',
-    netbanking: 'Net Banking',
-    wallet: 'Wallet',
-  };
-  return labels[mode] || mode;
-}
-
 export default function SettingsPage() {
   const [expenses, setExpenses] = useState(getExpenses);
   const [categories, setCategories] = useState(getCategories);
+  const [paymentModes, setPaymentModes] = useState(getPaymentModes);
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [editForm, setEditForm] = useState<Partial<Expense>>({});
   const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -60,6 +43,14 @@ export default function SettingsPage() {
     });
     return map;
   }, [categories]);
+
+  const paymentModeMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    paymentModes.forEach((pm) => {
+      map[pm.id] = pm.name;
+    });
+    return map;
+  }, [paymentModes]);
 
   const sortedExpenses = useMemo(() => {
     return [...expenses].sort((a, b) => {
@@ -76,6 +67,10 @@ export default function SettingsPage() {
     return subCat?.name || '';
   };
 
+  const getPaymentModeName = (expense: Expense): string => {
+    return paymentModeMap[expense.paymentModeId] || expense.paymentModeId;
+  };
+
   const selectedCategory = editForm.categoryId ? categoryMap[editForm.categoryId] : null;
   const subCategories = selectedCategory?.subCategories || [];
 
@@ -86,7 +81,7 @@ export default function SettingsPage() {
       date: expense.date,
       categoryId: expense.categoryId,
       subCategoryId: expense.subCategoryId,
-      paymentMode: expense.paymentMode,
+      paymentModeId: expense.paymentModeId,
       notes: expense.notes,
     });
     setIsSheetOpen(true);
@@ -138,6 +133,10 @@ export default function SettingsPage() {
     setCategories(getCategories());
   };
 
+  const refreshPaymentModes = () => {
+    setPaymentModes(getPaymentModes());
+  };
+
   return (
     <AppLayout>
       <div className="space-y-4 pb-6">
@@ -146,9 +145,10 @@ export default function SettingsPage() {
         </div>
 
         <Tabs defaultValue="transactions" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="transactions">Transactions</TabsTrigger>
             <TabsTrigger value="categories" onClick={refreshCategories}>Categories</TabsTrigger>
+            <TabsTrigger value="payment-modes" onClick={refreshPaymentModes}>Payment Modes</TabsTrigger>
           </TabsList>
           
           <TabsContent value="transactions" className="mt-4">
@@ -184,7 +184,7 @@ export default function SettingsPage() {
                             <p className="font-medium">{category?.name || 'Unknown'}</p>
                             <p className="text-xs text-muted-foreground">
                               {subCategoryName && `${subCategoryName} · `}
-                              {getPaymentModeLabel(expense.paymentMode)}
+                              {getPaymentModeName(expense)}
                             </p>
                           </div>
                         </div>
@@ -204,6 +204,10 @@ export default function SettingsPage() {
 
           <TabsContent value="categories" className="mt-4">
             <CategoryManager />
+          </TabsContent>
+
+          <TabsContent value="payment-modes" className="mt-4">
+            <PaymentModeManager />
           </TabsContent>
         </Tabs>
       </div>
@@ -289,16 +293,16 @@ export default function SettingsPage() {
             <div className="space-y-2">
               <Label>Payment Mode</Label>
               <Select 
-                value={editForm.paymentMode || ''} 
-                onValueChange={(v) => setEditForm({ ...editForm, paymentMode: v as PaymentMode })}
+                value={editForm.paymentModeId || ''} 
+                onValueChange={(v) => setEditForm({ ...editForm, paymentModeId: v })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select payment mode" />
                 </SelectTrigger>
                 <SelectContent className="bg-popover">
-                  {PAYMENT_MODES.map((mode) => (
-                    <SelectItem key={mode.value} value={mode.value}>
-                      {mode.label}
+                  {paymentModes.map((mode) => (
+                    <SelectItem key={mode.id} value={mode.id}>
+                      {mode.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
