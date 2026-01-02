@@ -1,4 +1,10 @@
-export type PaymentMode = 'cash' | 'upi' | 'card' | 'netbanking' | 'wallet';
+export type PaymentModeType = 'credit_card' | 'bank_account' | 'cash' | 'other';
+
+export interface PaymentMode {
+  id: string;
+  name: string;
+  type?: PaymentModeType;
+}
 
 export interface SubCategory {
   id: string;
@@ -19,7 +25,7 @@ export interface Expense {
   date: string; // YYYY-MM-DD
   categoryId: string;
   subCategoryId: string; // Required, cannot be empty
-  paymentMode: PaymentMode;
+  paymentModeId: string; // Reference to PaymentMode.id
   notes?: string;
   createdAt: string;
 }

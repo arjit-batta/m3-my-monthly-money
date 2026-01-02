@@ -19,17 +19,8 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { Label } from '@/components/ui/label';
-import { PaymentMode } from '@/types/expense';
-import { getCategories, addExpense, generateId } from '@/lib/storage';
+import { getCategories, getPaymentModes, addExpense, generateId } from '@/lib/storage';
 import { useToast } from '@/hooks/use-toast';
-
-const PAYMENT_MODES: { value: PaymentMode; label: string }[] = [
-  { value: 'cash', label: 'Cash' },
-  { value: 'upi', label: 'UPI' },
-  { value: 'card', label: 'Card' },
-  { value: 'netbanking', label: 'Net Banking' },
-  { value: 'wallet', label: 'Wallet' },
-];
 
 const STORAGE_KEYS = {
   LAST_CATEGORY: 'expense-last-category',
@@ -39,19 +30,20 @@ const STORAGE_KEYS = {
 function getLastUsedValues() {
   return {
     categoryId: localStorage.getItem(STORAGE_KEYS.LAST_CATEGORY) || '',
-    paymentMode: (localStorage.getItem(STORAGE_KEYS.LAST_PAYMENT_MODE) || '') as PaymentMode | '',
+    paymentModeId: localStorage.getItem(STORAGE_KEYS.LAST_PAYMENT_MODE) || '',
   };
 }
 
-function saveLastUsedValues(categoryId: string, paymentMode: PaymentMode) {
+function saveLastUsedValues(categoryId: string, paymentModeId: string) {
   localStorage.setItem(STORAGE_KEYS.LAST_CATEGORY, categoryId);
-  localStorage.setItem(STORAGE_KEYS.LAST_PAYMENT_MODE, paymentMode);
+  localStorage.setItem(STORAGE_KEYS.LAST_PAYMENT_MODE, paymentModeId);
 }
 
 export function ExpenseForm() {
   const { toast } = useToast();
   const amountInputRef = useRef<HTMLInputElement>(null);
   const categories = useMemo(() => getCategories(), []);
+  const paymentModes = useMemo(() => getPaymentModes(), []);
   const lastUsed = useMemo(() => getLastUsedValues(), []);
 
   const [amount, setAmount] = useState('');
@@ -61,7 +53,7 @@ export function ExpenseForm() {
   const [categoryTouched, setCategoryTouched] = useState(false);
   const [subCategoryId, setSubCategoryId] = useState('');
   const [subCategoryTouched, setSubCategoryTouched] = useState(false);
-  const [paymentMode, setPaymentMode] = useState<PaymentMode | ''>(lastUsed.paymentMode);
+  const [paymentModeId, setPaymentModeId] = useState(lastUsed.paymentModeId);
   const [paymentModeTouched, setPaymentModeTouched] = useState(false);
   const [notes, setNotes] = useState('');
 
@@ -79,7 +71,7 @@ export function ExpenseForm() {
   const amountError = amountTouched && (isNaN(amountNum) || amountNum <= 0) ? 'Amount must be greater than 0' : '';
   const categoryError = categoryTouched && !categoryId ? 'Category is required' : '';
   const subCategoryError = subCategoryTouched && hasSubCategories && !subCategoryId ? 'Sub-category is required' : '';
-  const paymentModeError = paymentModeTouched && !paymentMode ? 'Payment mode is required' : '';
+  const paymentModeError = paymentModeTouched && !paymentModeId ? 'Payment mode is required' : '';
 
   const isFormValid = useMemo(() => {
     const amountNum = parseFloat(amount);
@@ -89,9 +81,9 @@ export function ExpenseForm() {
       date &&
       categoryId !== '' &&
       subCategoryValid &&
-      paymentMode !== ''
+      paymentModeId !== ''
     );
-  }, [amount, date, categoryId, subCategoryId, paymentMode, hasSubCategories]);
+  }, [amount, date, categoryId, subCategoryId, paymentModeId, hasSubCategories]);
 
   const handleCategoryChange = (value: string) => {
     setCategoryId(value);
@@ -114,14 +106,14 @@ export function ExpenseForm() {
       amount: parseFloat(amount),
       date: format(date, 'yyyy-MM-dd'),
       categoryId,
-      subCategoryId: subCategoryId || undefined,
-      paymentMode: paymentMode as PaymentMode,
+      subCategoryId: subCategoryId || '',
+      paymentModeId,
       notes: notes.trim() || undefined,
       createdAt: new Date().toISOString(),
     };
 
     addExpense(expense);
-    saveLastUsedValues(categoryId, paymentMode as PaymentMode);
+    saveLastUsedValues(categoryId, paymentModeId);
 
     toast({
       title: 'Expense saved',
@@ -245,9 +237,9 @@ export function ExpenseForm() {
       <div className="space-y-2">
         <Label>Payment Mode</Label>
         <Select
-          value={paymentMode}
+          value={paymentModeId}
           onValueChange={(v) => {
-            setPaymentMode(v as PaymentMode);
+            setPaymentModeId(v);
             setPaymentModeTouched(true);
           }}
         >
@@ -255,9 +247,9 @@ export function ExpenseForm() {
             <SelectValue placeholder="Select payment mode" />
           </SelectTrigger>
           <SelectContent>
-            {PAYMENT_MODES.map((mode) => (
-              <SelectItem key={mode.value} value={mode.value}>
-                {mode.label}
+            {paymentModes.map((mode) => (
+              <SelectItem key={mode.id} value={mode.id}>
+                {mode.name}
               </SelectItem>
             ))}
           </SelectContent>

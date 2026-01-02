@@ -1,16 +1,11 @@
 import { z } from 'zod';
-import { PaymentMode } from '@/types/expense';
-
-const paymentModes: PaymentMode[] = ['cash', 'upi', 'card', 'netbanking', 'wallet'];
 
 export const expenseSchema = z.object({
   amount: z.number().positive({ message: 'Amount must be greater than 0' }),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { message: 'Invalid date format' }),
   categoryId: z.string().min(1, { message: 'Category is required' }),
   subCategoryId: z.string().min(1, { message: 'Sub-category is required' }), // MANDATORY
-  paymentMode: z.enum(paymentModes as [PaymentMode, ...PaymentMode[]], {
-    errorMap: () => ({ message: 'Payment mode is required' }),
-  }),
+  paymentModeId: z.string().min(1, { message: 'Payment mode is required' }),
   notes: z.string().max(200, { message: 'Notes must be less than 200 characters' }).optional(),
 });
 
@@ -40,7 +35,13 @@ export const subCategorySchema = z.object({
   name: z.string().min(1, { message: 'Sub-category name is required' }).max(50),
 });
 
+export const paymentModeSchema = z.object({
+  name: z.string().min(1, { message: 'Payment mode name is required' }).max(50),
+  type: z.enum(['credit_card', 'bank_account', 'cash', 'other']).optional(),
+});
+
 export type ExpenseInput = z.infer<typeof expenseSchema>;
 export type BudgetInput = z.infer<typeof budgetSchema>;
 export type CategoryInput = z.infer<typeof categorySchema>;
 export type SubCategoryInput = z.infer<typeof subCategorySchema>;
+export type PaymentModeInput = z.infer<typeof paymentModeSchema>;

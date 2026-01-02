@@ -9,19 +9,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { useBudgetData } from '@/hooks/useBudgetData';
-import { getExpenses, getCategories } from '@/lib/storage';
-import { PaymentMode } from '@/types/expense';
+import { getExpenses, getCategories, getPaymentModes } from '@/lib/storage';
 import { cn } from '@/lib/utils';
 
 const COLORS = ['#2563eb', '#16a34a', '#ea580c', '#8b5cf6', '#ec4899', '#14b8a6', '#f59e0b', '#6366f1'];
-
-const PAYMENT_MODES: { value: PaymentMode; label: string }[] = [
-  { value: 'cash', label: 'Cash' },
-  { value: 'upi', label: 'UPI' },
-  { value: 'card', label: 'Card' },
-  { value: 'netbanking', label: 'Net Banking' },
-  { value: 'wallet', label: 'Wallet' },
-];
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-IN', {
@@ -54,7 +45,16 @@ export default function Analytics() {
   const [showFilters, setShowFilters] = useState(false);
 
   const allCategories = getCategories();
+  const paymentModes = useMemo(() => getPaymentModes(), []);
   const { categories: budgetCategories, totalBudget } = useBudgetData(month, year);
+
+  const paymentModeMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    paymentModes.forEach(pm => {
+      map[pm.id] = pm.name;
+    });
+    return map;
+  }, [paymentModes]);
 
   const goToPrevMonth = () => {
     if (month === 1) {
@@ -100,7 +100,7 @@ export default function Analytics() {
       }
       
       // Payment mode filter
-      if (selectedPaymentMode !== 'all' && e.paymentMode !== selectedPaymentMode) {
+      if (selectedPaymentMode !== 'all' && e.paymentModeId !== selectedPaymentMode) {
         return false;
       }
       
@@ -271,9 +271,9 @@ export default function Analytics() {
                   </SelectTrigger>
                   <SelectContent className="bg-popover">
                     <SelectItem value="all">All modes</SelectItem>
-                    {PAYMENT_MODES.map((mode) => (
-                      <SelectItem key={mode.value} value={mode.value}>
-                        {mode.label}
+                    {paymentModes.map((mode) => (
+                      <SelectItem key={mode.id} value={mode.id}>
+                        {mode.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -454,64 +454,52 @@ export default function Analytics() {
         )}
 
         {/* Budget vs Spent Comparison */}
-        {budgetComparisonData.some((c) => c.totalBudget > 0 || c.totalSpent > 0) && (
+        {budgetComparisonData.length > 0 && (
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Budget vs Spent</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {budgetComparisonData
-                .filter((c) => c.totalBudget > 0 || c.totalSpent > 0)
-                .map((category) => {
-                  const isOver = category.totalSpent > category.totalBudget && category.totalBudget > 0;
-                  const barMax = Math.max(category.totalBudget, category.totalSpent);
-                  const budgetWidth = barMax > 0 ? (category.totalBudget / barMax) * 100 : 0;
-                  const spentWidth = barMax > 0 ? (category.totalSpent / barMax) * 100 : 0;
-                  const spentPercentage = category.totalBudget > 0 ? (category.totalSpent / category.totalBudget) * 100 : 0;
-
-                  return (
-                    <div key={category.categoryId} className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">
-                          {category.icon} {category.categoryName}
-                        </span>
-                        {isOver && (
-                          <span className="text-xs font-medium text-destructive">
-                            Over by {formatCurrency(category.totalSpent - category.totalBudget)}
-                          </span>
-                        )}
-                      </div>
-                      <div className="relative h-6 rounded-md bg-muted">
-                        {/* Budget bar (background) */}
-                        {category.totalBudget > 0 && (
-                          <div
-                            className="absolute inset-y-0 left-0 rounded-md bg-primary/20"
-                            style={{ width: `${budgetWidth}%` }}
-                          />
-                        )}
-                        {/* Spent bar (foreground) */}
-                        <div
-                          className={`absolute inset-y-0 left-0 rounded-md transition-all ${
-                            isOver ? 'bg-destructive' : spentPercentage >= 75 ? 'bg-orange-500' : 'bg-green-600'
-                          }`}
-                          style={{ width: `${spentWidth}%` }}
-                        />
-                      </div>
-                      <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>Spent: {formatCurrency(category.totalSpent)}</span>
-                        <span>Budget: {formatCurrency(category.totalBudget)}</span>
-                      </div>
+              {budgetComparisonData.map((cat) => {
+                const spentPercent = cat.totalBudget > 0 ? (cat.totalSpent / cat.totalBudget) * 100 : 0;
+                const statusColor = getStatusColor(spentPercent, cat.totalBudget > 0);
+                
+                return (
+                  <div key={cat.categoryId} className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="flex items-center gap-2">
+                        <span>{cat.icon}</span>
+                        <span>{cat.categoryName}</span>
+                      </span>
+                      <span className={statusColor}>
+                        {formatCurrency(cat.totalSpent)} / {formatCurrency(cat.totalBudget)}
+                      </span>
                     </div>
-                  );
-                })}
+                    <div className="h-2 rounded-full bg-muted overflow-hidden">
+                      <div 
+                        className={cn(
+                          "h-full rounded-full transition-all",
+                          spentPercent >= 100 ? "bg-destructive" : 
+                          spentPercent >= 75 ? "bg-orange-500" : "bg-green-600"
+                        )}
+                        style={{ width: `${Math.min(spentPercent, 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
             </CardContent>
           </Card>
         )}
 
-        {totalSpent === 0 && totalBudget === 0 && (
-          <p className="text-center text-sm text-muted-foreground">
-            No expenses or budgets recorded for this month.
-          </p>
+        {/* Empty State */}
+        {filteredExpenses.length === 0 && (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <p className="text-muted-foreground">No expenses recorded for this period</p>
+              <p className="text-sm text-muted-foreground mt-1">Add your first expense to see analytics</p>
+            </CardContent>
+          </Card>
         )}
       </div>
     </AppLayout>
