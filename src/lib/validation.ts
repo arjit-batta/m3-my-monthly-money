@@ -14,7 +14,7 @@ export const budgetSchema = z.object({
   subCategoryId: z.string().min(1, { message: 'Sub-category is required' }),
   month: z.number().min(1).max(12, { message: 'Month must be between 1 and 12' }),
   year: z.number().min(2020).max(2100, { message: 'Year must be between 2020 and 2100' }),
-  amount: z.number().positive({ message: 'Budget amount must be greater than 0' }),
+  amount: z.number().min(0, { message: 'Budget amount cannot be negative' }),
 });
 
 export const categorySchema = z.object({

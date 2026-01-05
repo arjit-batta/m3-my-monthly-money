@@ -45,7 +45,7 @@ export function BudgetEditor({
   const [categories] = useState<Category[]>(() => getCategories());
   const [categoryId, setCategoryId] = useState(initialCategoryId);
   const [subCategoryId, setSubCategoryId] = useState(initialSubCategoryId);
-  const [amount, setAmount] = useState(initialAmount > 0 ? String(initialAmount) : '');
+  const [amount, setAmount] = useState(initialAmount >= 0 ? String(initialAmount) : '');
 
   const selectedCategory = categories.find((c) => c.id === categoryId);
   const subCategories = selectedCategory?.subCategories || [];
@@ -55,7 +55,7 @@ export function BudgetEditor({
     if (open) {
       setCategoryId(initialCategoryId);
       setSubCategoryId(initialSubCategoryId);
-      setAmount(initialAmount > 0 ? String(initialAmount) : '');
+      setAmount(String(initialAmount));
     }
   }, [open, initialCategoryId, initialSubCategoryId, initialAmount]);
 
@@ -64,7 +64,7 @@ export function BudgetEditor({
     setSubCategoryId('');
   };
 
-  const isValid = categoryId && subCategoryId && parseFloat(amount) > 0;
+  const isValid = categoryId && subCategoryId && amount !== '' && parseFloat(amount) >= 0;
 
   const handleSave = () => {
     if (!isValid) return;
@@ -88,7 +88,7 @@ export function BudgetEditor({
     onSave?.();
   };
 
-  const isEditing = initialAmount > 0;
+  const isEditing = initialCategoryId !== '' && initialSubCategoryId !== '';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
