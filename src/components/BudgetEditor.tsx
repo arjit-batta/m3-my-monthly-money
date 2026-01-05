@@ -147,12 +147,16 @@ export function BudgetEditor({
               <Input
                 type="number"
                 inputMode="decimal"
+                min="0"
                 placeholder="0"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 className="pl-9"
               />
             </div>
+            <p className="text-xs text-muted-foreground">
+              Set to 0 to remove budget tracking for this sub-category.
+            </p>
           </div>
 
           <Button onClick={handleSave} disabled={!isValid} className="w-full">
