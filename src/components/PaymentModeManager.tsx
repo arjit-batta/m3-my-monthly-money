@@ -144,12 +144,14 @@ export function PaymentModeManager() {
                     </AlertDialogTrigger>
                     <AlertDialogContent>
                       <AlertDialogHeader>
-                        <AlertDialogTitle>Delete "{mode.name}"?</AlertDialogTitle>
+                        <AlertDialogTitle>
+                          {hasDependencies ? 'Cannot Delete' : `Delete "${mode.name}"?`}
+                        </AlertDialogTitle>
                         <AlertDialogDescription>
                           {hasDependencies ? (
                             <>
-                              <span className="font-semibold text-destructive">Warning:</span> This payment mode is used by {expenseCount} expense{expenseCount !== 1 ? 's' : ''}.
-                              Deleting it will affect these records.
+                              This payment mode is used by <span className="font-semibold">{expenseCount} expense{expenseCount !== 1 ? 's' : ''}</span>.
+                              Please reassign or delete those expenses first before removing this payment mode.
                             </>
                           ) : (
                             'This action cannot be undone.'
@@ -157,13 +159,19 @@ export function PaymentModeManager() {
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={() => handleDelete(mode.id)}
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                        >
-                          Delete
-                        </AlertDialogAction>
+                        {hasDependencies ? (
+                          <AlertDialogCancel>OK</AlertDialogCancel>
+                        ) : (
+                          <>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleDelete(mode.id)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </>
+                        )}
                       </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
