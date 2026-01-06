@@ -456,24 +456,43 @@ export default function Analytics() {
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Spending by Payment Mode</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              {paymentModeData.map((item, index) => {
-                const percentage = totalSpent > 0 ? (item.value / totalSpent) * 100 : 0;
-                return (
-                  <div key={index} className="space-y-1">
-                    <div className="flex items-center justify-between text-sm">
-                      <span>{item.name}</span>
-                      <span className="font-medium">{formatCurrency(item.value)}</span>
-                    </div>
-                    <div className="h-2 rounded-full bg-muted overflow-hidden">
-                      <div 
-                        className="h-full rounded-full bg-primary transition-all"
-                        style={{ width: `${percentage}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
+            <CardContent>
+              <div className="h-[180px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={paymentModeData} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
+                    <XAxis 
+                      type="number" 
+                      tick={{ fontSize: 10 }} 
+                      tickLine={false} 
+                      axisLine={false}
+                      tickFormatter={(value) => `₹${(value / 1000).toFixed(0)}k`}
+                    />
+                    <YAxis 
+                      type="category"
+                      dataKey="name" 
+                      tick={{ fontSize: 11 }} 
+                      tickLine={false} 
+                      axisLine={false}
+                      width={80}
+                    />
+                    <Tooltip 
+                      formatter={(value: number) => [formatCurrency(value), 'Spent']}
+                      contentStyle={{ 
+                        backgroundColor: 'hsl(var(--card))', 
+                        borderColor: 'hsl(var(--border))',
+                        borderRadius: '8px',
+                        fontSize: '12px'
+                      }}
+                    />
+                    <Bar 
+                      dataKey="value" 
+                      fill="hsl(var(--primary))" 
+                      radius={[0, 4, 4, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </CardContent>
           </Card>
         )}
