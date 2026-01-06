@@ -55,14 +55,15 @@ export function CategoryManager() {
   };
 
   // Get dependency counts for sub-category
+  // Allow deletion if: no expenses AND (no budget OR budget amount is 0)
   const getSubCategoryDependencies = (categoryId: string, subCategoryId: string) => {
     const expenses = getExpenses();
     const budgets = getBudgets();
     
     const expenseCount = expenses.filter(e => e.categoryId === categoryId && e.subCategoryId === subCategoryId).length;
-    const budgetCount = budgets.filter(b => b.categoryId === categoryId && b.subCategoryId === subCategoryId).length;
+    const activeBudget = budgets.find(b => b.categoryId === categoryId && b.subCategoryId === subCategoryId && b.amount > 0);
     
-    return { expenseCount, budgetCount, hasAny: expenseCount > 0 || budgetCount > 0 };
+    return { expenseCount, hasActiveBudget: !!activeBudget, canDelete: expenseCount === 0 && !activeBudget };
   };
 
   // Get dependency counts for category
@@ -173,8 +174,11 @@ export function CategoryManager() {
     }
 
     const deps = getSubCategoryDependencies(deleteDialog.categoryId, deleteDialog.subId);
-    if (deps.hasAny) {
-      toast({ title: 'Cannot delete', description: `This sub-category has ${deps.expenseCount} expense(s) and ${deps.budgetCount} budget(s)`, variant: 'destructive' });
+    if (!deps.canDelete) {
+      const reasons = [];
+      if (deps.expenseCount > 0) reasons.push(`${deps.expenseCount} expense(s)`);
+      if (deps.hasActiveBudget) reasons.push('an active budget');
+      toast({ title: 'Cannot delete', description: `This sub-category has ${reasons.join(' and ')}`, variant: 'destructive' });
       setDeleteDialog(null);
       return;
     }
@@ -386,10 +390,13 @@ export function CategoryManager() {
                         return <p className="text-destructive font-medium">⚠️ Cannot delete: Category must have at least one sub-category.</p>;
                       }
                       const deps = getSubCategoryDependencies(deleteDialog.categoryId, deleteDialog.subId);
-                      if (deps.hasAny) {
+                      if (!deps.canDelete) {
+                        const reasons = [];
+                        if (deps.expenseCount > 0) reasons.push(`${deps.expenseCount} expense(s)`);
+                        if (deps.hasActiveBudget) reasons.push('an active budget');
                         return (
                           <p className="text-destructive font-medium">
-                            ⚠️ Cannot delete: {deps.expenseCount} expense(s) and {deps.budgetCount} budget(s) exist.
+                            ⚠️ Cannot delete: {reasons.join(' and ')} exist.
                           </p>
                         );
                       }
