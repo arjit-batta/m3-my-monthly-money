@@ -170,6 +170,22 @@ export default function Analytics() {
     }
   }, [filteredExpenses, trendView, monthStart, monthEnd]);
 
+  // Expenses grouped by payment mode
+  const paymentModeData = useMemo(() => {
+    const modeTotals: Record<string, number> = {};
+    
+    filteredExpenses.forEach((e) => {
+      modeTotals[e.paymentModeId] = (modeTotals[e.paymentModeId] || 0) + e.amount;
+    });
+
+    return Object.entries(modeTotals)
+      .map(([modeId, value]) => ({
+        name: paymentModeMap[modeId] || 'Unknown',
+        value,
+      }))
+      .sort((a, b) => b.value - a.value);
+  }, [filteredExpenses, paymentModeMap]);
+
 
   const hasActiveFilters = selectedCategory !== 'all' || selectedPaymentMode !== 'all' || dateRange.from || dateRange.to;
 
@@ -433,6 +449,34 @@ export default function Analytics() {
           </Card>
         )}
 
+
+        {/* Spending by Payment Mode */}
+        {paymentModeData.length > 0 && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Spending by Payment Mode</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {paymentModeData.map((item, index) => {
+                const percentage = totalSpent > 0 ? (item.value / totalSpent) * 100 : 0;
+                return (
+                  <div key={index} className="space-y-1">
+                    <div className="flex items-center justify-between text-sm">
+                      <span>{item.name}</span>
+                      <span className="font-medium">{formatCurrency(item.value)}</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-muted overflow-hidden">
+                      <div 
+                        className="h-full rounded-full bg-primary transition-all"
+                        style={{ width: `${percentage}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Empty State */}
         {filteredExpenses.length === 0 && (
