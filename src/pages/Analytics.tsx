@@ -170,26 +170,6 @@ export default function Analytics() {
     }
   }, [filteredExpenses, trendView, monthStart, monthEnd]);
 
-  // Budget vs Spent data (filtered by category if selected)
-  const budgetComparisonData = useMemo(() => {
-    if (selectedCategory !== 'all') {
-      const cat = budgetCategories.find((c) => c.categoryId === selectedCategory);
-      if (cat) {
-        return [{
-          ...cat,
-          totalSpent: filteredExpenses.reduce((sum, e) => sum + e.amount, 0),
-        }];
-      }
-      return [];
-    }
-    
-    return budgetCategories.map((cat) => ({
-      ...cat,
-      totalSpent: filteredExpenses
-        .filter((e) => e.categoryId === cat.categoryId)
-        .reduce((sum, e) => sum + e.amount, 0),
-    }));
-  }, [budgetCategories, filteredExpenses, selectedCategory]);
 
   const hasActiveFilters = selectedCategory !== 'all' || selectedPaymentMode !== 'all' || dateRange.from || dateRange.to;
 
@@ -453,44 +433,6 @@ export default function Analytics() {
           </Card>
         )}
 
-        {/* Budget vs Spent Comparison */}
-        {budgetComparisonData.length > 0 && (
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Budget vs Spent</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {budgetComparisonData.map((cat) => {
-                const spentPercent = cat.totalBudget > 0 ? (cat.totalSpent / cat.totalBudget) * 100 : 0;
-                const statusColor = getStatusColor(spentPercent, cat.totalBudget > 0);
-                
-                return (
-                  <div key={cat.categoryId} className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="flex items-center gap-2">
-                        <span>{cat.icon}</span>
-                        <span>{cat.categoryName}</span>
-                      </span>
-                      <span className={statusColor}>
-                        {formatCurrency(cat.totalSpent)} / {formatCurrency(cat.totalBudget)}
-                      </span>
-                    </div>
-                    <div className="h-2 rounded-full bg-muted overflow-hidden">
-                      <div 
-                        className={cn(
-                          "h-full rounded-full transition-all",
-                          spentPercent >= 100 ? "bg-destructive" : 
-                          spentPercent >= 75 ? "bg-orange-500" : "bg-green-600"
-                        )}
-                        style={{ width: `${Math.min(spentPercent, 100)}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </CardContent>
-          </Card>
-        )}
 
         {/* Empty State */}
         {filteredExpenses.length === 0 && (
