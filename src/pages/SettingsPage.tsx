@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { format, parseISO } from 'date-fns';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Loader2, LogOut } from 'lucide-react';
 import { AppLayout } from '@/components/AppLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,12 +12,13 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { getExpenses, getCategories, getPaymentModes, deleteExpense, updateExpense } from '@/lib/storage';
-import { Expense, Category } from '@/types/expense';
+import { getExpenses, getCategories, getPaymentModes, deleteExpense, updateExpense } from '@/lib/database';
+import { Expense, Category, PaymentMode } from '@/types/expense';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { CategoryManager } from '@/components/CategoryManager';
 import { PaymentModeManager } from '@/components/PaymentModeManager';
+import { useAuth } from '@/hooks/useAuth';
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-IN', {
@@ -29,12 +30,36 @@ function formatCurrency(amount: number): string {
 }
 
 export default function SettingsPage() {
-  const [expenses, setExpenses] = useState(getExpenses);
-  const [categories, setCategories] = useState(getCategories);
-  const [paymentModes, setPaymentModes] = useState(getPaymentModes);
+  const { signOut, user } = useAuth();
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [paymentModes, setPaymentModes] = useState<PaymentMode[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [editForm, setEditForm] = useState<Partial<Expense>>({});
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const loadData = useCallback(async () => {
+    try {
+      const [exps, cats, modes] = await Promise.all([
+        getExpenses(),
+        getCategories(),
+        getPaymentModes(),
+      ]);
+      setExpenses(exps);
+      setCategories(cats);
+      setPaymentModes(modes);
+    } catch (error) {
+      console.error('Failed to load data:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const categoryMap = useMemo(() => {
     const map: Record<string, Category> = {};
@@ -87,7 +112,7 @@ export default function SettingsPage() {
     setIsSheetOpen(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!selectedExpense) return;
     
     if (!editForm.amount || editForm.amount <= 0) {
@@ -103,20 +128,29 @@ export default function SettingsPage() {
       return;
     }
 
-    const success = updateExpense(selectedExpense.id, editForm);
-    if (success) {
-      setExpenses(getExpenses());
+    setSaving(true);
+    try {
+      await updateExpense(selectedExpense.id, editForm);
+      await loadData();
       setIsSheetOpen(false);
       toast({ title: 'Transaction updated' });
+    } catch (error) {
+      console.error('Failed to update expense:', error);
+      toast({ title: 'Failed to update', variant: 'destructive' });
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleDelete = (expenseId: string) => {
-    const success = deleteExpense(expenseId);
-    if (success) {
-      setExpenses(getExpenses());
+  const handleDelete = async (expenseId: string) => {
+    try {
+      await deleteExpense(expenseId);
+      await loadData();
       setIsSheetOpen(false);
       toast({ title: 'Transaction deleted' });
+    } catch (error) {
+      console.error('Failed to delete expense:', error);
+      toast({ title: 'Failed to delete', variant: 'destructive' });
     }
   };
 
@@ -129,19 +163,52 @@ export default function SettingsPage() {
     });
   };
 
-  const refreshCategories = () => {
-    setCategories(getCategories());
+  const refreshCategories = async () => {
+    try {
+      const cats = await getCategories();
+      setCategories(cats);
+    } catch (error) {
+      console.error('Failed to refresh categories:', error);
+    }
   };
 
-  const refreshPaymentModes = () => {
-    setPaymentModes(getPaymentModes());
+  const refreshPaymentModes = async () => {
+    try {
+      const modes = await getPaymentModes();
+      setPaymentModes(modes);
+    } catch (error) {
+      console.error('Failed to refresh payment modes:', error);
+    }
   };
+
+  const handleSignOut = async () => {
+    await signOut();
+  };
+
+  if (loading) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>
       <div className="space-y-4 pb-6">
-        <div className="pt-6">
-          <h1 className="text-xl font-semibold">Settings</h1>
+        <div className="pt-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-semibold">Settings</h1>
+            {user?.email && (
+              <p className="text-sm text-muted-foreground">{user.email}</p>
+            )}
+          </div>
+          <Button variant="outline" size="sm" onClick={handleSignOut}>
+            <LogOut className="mr-2 h-4 w-4" />
+            Sign Out
+          </Button>
         </div>
 
         <Tabs defaultValue="transactions" className="w-full">
@@ -321,7 +388,8 @@ export default function SettingsPage() {
 
             {/* Actions */}
             <div className="flex gap-3 pt-4">
-              <Button onClick={handleSave} className="flex-1">
+              <Button onClick={handleSave} className="flex-1" disabled={saving}>
+                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Save Changes
               </Button>
               

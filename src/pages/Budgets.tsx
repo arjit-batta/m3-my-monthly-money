@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { format } from 'date-fns';
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Loader2 } from 'lucide-react';
 import { AppLayout } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
 import { BudgetCard } from '@/components/BudgetCard';
@@ -28,7 +28,7 @@ export default function Budgets() {
   const [editSubCategoryId, setEditSubCategoryId] = useState('');
   const [editAmount, setEditAmount] = useState(0);
 
-  const { categories, totalBudget, totalSpent, remaining } = useBudgetData(month, year, refreshKey);
+  const { categories, totalBudget, totalSpent, remaining, loading } = useBudgetData(month, year, refreshKey);
 
   const goToPrevMonth = () => {
     if (month === 1) {
@@ -112,18 +112,27 @@ export default function Budgets() {
           Add Budget
         </Button>
 
-        {/* Category cards */}
-        <div className="space-y-3">
-          {categories.map((category) => (
-            <BudgetCard
-              key={`${category.categoryId}-${refreshKey}`}
-              category={category}
-              onEditBudget={handleEditBudget}
-            />
-          ))}
-        </div>
+        {/* Loading state */}
+        {loading && (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        )}
 
-        {categories.length === 0 && (
+        {/* Category cards */}
+        {!loading && (
+          <div className="space-y-3">
+            {categories.map((category) => (
+              <BudgetCard
+                key={`${category.categoryId}-${refreshKey}`}
+                category={category}
+                onEditBudget={handleEditBudget}
+              />
+            ))}
+          </div>
+        )}
+
+        {!loading && categories.length === 0 && (
           <p className="text-center text-muted-foreground">No categories found</p>
         )}
       </div>
