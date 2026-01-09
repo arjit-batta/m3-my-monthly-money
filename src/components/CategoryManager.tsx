@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Plus, Pencil, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Plus, Pencil, Trash2, ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,24 +15,27 @@ import {
   addSubCategory,
   updateSubCategory,
   deleteSubCategory,
-  generateId,
   getExpenses,
   getBudgets
-} from '@/lib/storage';
-import { Category } from '@/types/expense';
+} from '@/lib/database';
+import { Category, Expense, Budget } from '@/types/expense';
 import { toast } from '@/hooks/use-toast';
 
 const EMOJI_OPTIONS = ['🍔', '🚗', '🛒', '💡', '🎬', '💊', '📚', '👤', '🏠', '✈️', '🎮', '💰', '🎁', '📱', '🏋️'];
 const COLOR_OPTIONS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#14b8a6', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899', '#6b7280'];
 
 export function CategoryManager() {
-  const [categories, setCategories] = useState(getCategories);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [loading, setLoading] = useState(true);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   
   // Category sheet
   const [isCategorySheetOpen, setIsCategorySheetOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [categoryForm, setCategoryForm] = useState({ name: '', icon: '📦', color: '#3b82f6' });
+  const [saving, setSaving] = useState(false);
   
   // Sub-category sheet
   const [isSubCategorySheetOpen, setIsSubCategorySheetOpen] = useState(false);
@@ -42,7 +45,26 @@ export function CategoryManager() {
   // Delete dialogs
   const [deleteDialog, setDeleteDialog] = useState<{ type: 'category' | 'subcategory'; categoryId: string; subId?: string } | null>(null);
 
-  const refreshCategories = () => setCategories(getCategories());
+  const loadData = useCallback(async () => {
+    try {
+      const [cats, exps, budgs] = await Promise.all([
+        getCategories(),
+        getExpenses(),
+        getBudgets(),
+      ]);
+      setCategories(cats);
+      setExpenses(exps);
+      setBudgets(budgs);
+    } catch (error) {
+      console.error('Failed to load categories:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const toggleCategory = (categoryId: string) => {
     const newExpanded = new Set(expandedCategories);
@@ -55,25 +77,16 @@ export function CategoryManager() {
   };
 
   // Get dependency counts for sub-category
-  // Allow deletion if: no expenses AND (no budget OR budget amount is 0)
   const getSubCategoryDependencies = (categoryId: string, subCategoryId: string) => {
-    const expenses = getExpenses();
-    const budgets = getBudgets();
-    
     const expenseCount = expenses.filter(e => e.categoryId === categoryId && e.subCategoryId === subCategoryId).length;
     const activeBudget = budgets.find(b => b.categoryId === categoryId && b.subCategoryId === subCategoryId && b.amount > 0);
-    
     return { expenseCount, hasActiveBudget: !!activeBudget, canDelete: expenseCount === 0 && !activeBudget };
   };
 
   // Get dependency counts for category
   const getCategoryDependencies = (categoryId: string) => {
-    const expenses = getExpenses();
-    const budgets = getBudgets();
-    
     const expenseCount = expenses.filter(e => e.categoryId === categoryId).length;
     const budgetCount = budgets.filter(b => b.categoryId === categoryId).length;
-    
     return { expenseCount, budgetCount, hasAny: expenseCount > 0 || budgetCount > 0 };
   };
 
@@ -87,36 +100,40 @@ export function CategoryManager() {
   const openEditCategory = (category: Category) => {
     setEditingCategory(category);
     setCategoryForm({ name: category.name, icon: category.icon, color: category.color });
-    
     setIsCategorySheetOpen(true);
   };
 
-  const handleSaveCategory = () => {
+  const handleSaveCategory = async () => {
     if (!categoryForm.name.trim()) {
       toast({ title: 'Category name is required', variant: 'destructive' });
       return;
     }
 
-    if (editingCategory) {
-      updateCategory(editingCategory.id, { name: categoryForm.name.trim(), icon: categoryForm.icon, color: categoryForm.color });
-      toast({ title: 'Category updated' });
-    } else {
-      const newCategory: Category = {
-        id: generateId(),
-        name: categoryForm.name.trim(),
-        icon: categoryForm.icon,
-        color: categoryForm.color,
-        subCategories: [{ id: generateId(), name: 'General' }],
-      };
-      addCategory(newCategory);
-      toast({ title: 'Category added' });
+    setSaving(true);
+    try {
+      if (editingCategory) {
+        await updateCategory(editingCategory.id, { name: categoryForm.name.trim(), icon: categoryForm.icon });
+        toast({ title: 'Category updated' });
+      } else {
+        await addCategory({
+          name: categoryForm.name.trim(),
+          icon: categoryForm.icon,
+          subCategories: [{ id: '', name: 'General' }],
+        });
+        toast({ title: 'Category added' });
+      }
+      
+      await loadData();
+      setIsCategorySheetOpen(false);
+    } catch (error) {
+      console.error('Failed to save category:', error);
+      toast({ title: 'Failed to save category', variant: 'destructive' });
+    } finally {
+      setSaving(false);
     }
-    
-    refreshCategories();
-    setIsCategorySheetOpen(false);
   };
 
-  const handleDeleteCategory = () => {
+  const handleDeleteCategory = async () => {
     if (!deleteDialog || deleteDialog.type !== 'category') return;
     
     const deps = getCategoryDependencies(deleteDialog.categoryId);
@@ -126,9 +143,14 @@ export function CategoryManager() {
       return;
     }
 
-    deleteCategory(deleteDialog.categoryId);
-    refreshCategories();
-    toast({ title: 'Category deleted' });
+    try {
+      await deleteCategory(deleteDialog.categoryId);
+      await loadData();
+      toast({ title: 'Category deleted' });
+    } catch (error) {
+      console.error('Failed to delete category:', error);
+      toast({ title: 'Failed to delete category', variant: 'destructive' });
+    }
     setDeleteDialog(null);
   };
 
@@ -145,25 +167,33 @@ export function CategoryManager() {
     setIsSubCategorySheetOpen(true);
   };
 
-  const handleSaveSubCategory = () => {
+  const handleSaveSubCategory = async () => {
     if (!subCategoryForm.name.trim()) {
       toast({ title: 'Sub-category name is required', variant: 'destructive' });
       return;
     }
 
-    if (editingSubCategory) {
-      updateSubCategory(editingSubCategory.categoryId, editingSubCategory.subId, { name: subCategoryForm.name.trim() });
-      toast({ title: 'Sub-category updated' });
-    } else {
-      addSubCategory(subCategoryForm.categoryId, { id: generateId(), name: subCategoryForm.name.trim() });
-      toast({ title: 'Sub-category added' });
+    setSaving(true);
+    try {
+      if (editingSubCategory) {
+        await updateSubCategory(editingSubCategory.subId, subCategoryForm.name.trim());
+        toast({ title: 'Sub-category updated' });
+      } else {
+        await addSubCategory(subCategoryForm.categoryId, subCategoryForm.name.trim());
+        toast({ title: 'Sub-category added' });
+      }
+      
+      await loadData();
+      setIsSubCategorySheetOpen(false);
+    } catch (error) {
+      console.error('Failed to save sub-category:', error);
+      toast({ title: 'Failed to save sub-category', variant: 'destructive' });
+    } finally {
+      setSaving(false);
     }
-    
-    refreshCategories();
-    setIsSubCategorySheetOpen(false);
   };
 
-  const handleDeleteSubCategory = () => {
+  const handleDeleteSubCategory = async () => {
     if (!deleteDialog || deleteDialog.type !== 'subcategory' || !deleteDialog.subId) return;
     
     const category = categories.find(c => c.id === deleteDialog.categoryId);
@@ -183,11 +213,24 @@ export function CategoryManager() {
       return;
     }
 
-    deleteSubCategory(deleteDialog.categoryId, deleteDialog.subId);
-    refreshCategories();
-    toast({ title: 'Sub-category deleted' });
+    try {
+      await deleteSubCategory(deleteDialog.subId);
+      await loadData();
+      toast({ title: 'Sub-category deleted' });
+    } catch (error) {
+      console.error('Failed to delete sub-category:', error);
+      toast({ title: 'Failed to delete sub-category', variant: 'destructive' });
+    }
     setDeleteDialog(null);
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -328,7 +371,8 @@ export function CategoryManager() {
                 ))}
               </div>
             </div>
-            <Button onClick={handleSaveCategory} className="w-full">
+            <Button onClick={handleSaveCategory} className="w-full" disabled={saving}>
+              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {editingCategory ? 'Save Changes' : 'Add Category'}
             </Button>
           </div>
@@ -350,7 +394,8 @@ export function CategoryManager() {
                 placeholder="Sub-category name"
               />
             </div>
-            <Button onClick={handleSaveSubCategory} className="w-full">
+            <Button onClick={handleSaveSubCategory} className="w-full" disabled={saving}>
+              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {editingSubCategory ? 'Save Changes' : 'Add Sub-category'}
             </Button>
           </div>

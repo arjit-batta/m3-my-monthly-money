@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, eachWeekOfInterval, startOfMonth, endOfMonth, isSameDay, isWithinInterval, parseISO } from 'date-fns';
-import { ChevronLeft, ChevronRight, Filter, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Filter, X, Loader2 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { AppLayout } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
@@ -9,8 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { useBudgetData } from '@/hooks/useBudgetData';
-import { getExpenses, getCategories, getPaymentModes } from '@/lib/storage';
+import { getExpenses, getCategories, getPaymentModes } from '@/lib/database';
 import { cn } from '@/lib/utils';
+import { Category, PaymentMode, Expense } from '@/types/expense';
 
 const COLORS = ['#2563eb', '#16a34a', '#ea580c', '#8b5cf6', '#ec4899', '#14b8a6', '#f59e0b', '#6366f1'];
 
@@ -44,9 +45,34 @@ export default function Analytics() {
   const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({});
   const [showFilters, setShowFilters] = useState(false);
 
-  const allCategories = getCategories();
-  const paymentModes = useMemo(() => getPaymentModes(), []);
+  // Data states
+  const [allCategories, setAllCategories] = useState<Category[]>([]);
+  const [paymentModes, setPaymentModes] = useState<PaymentMode[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [loading, setLoading] = useState(true);
+
   const { categories: budgetCategories, totalBudget } = useBudgetData(month, year);
+
+  // Load data
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [cats, modes, exps] = await Promise.all([
+          getCategories(),
+          getPaymentModes(),
+          getExpenses(),
+        ]);
+        setAllCategories(cats);
+        setPaymentModes(modes);
+        setExpenses(exps);
+      } catch (error) {
+        console.error('Failed to load analytics data:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
 
   const paymentModeMap = useMemo(() => {
     const map: Record<string, string> = {};
@@ -84,8 +110,6 @@ export default function Analytics() {
 
   // Get filtered expenses
   const filteredExpenses = useMemo(() => {
-    const expenses = getExpenses();
-    
     return expenses.filter((e) => {
       const expenseDate = parseISO(e.date);
       
@@ -114,7 +138,7 @@ export default function Analytics() {
       
       return true;
     });
-  }, [month, year, selectedCategory, selectedPaymentMode, dateRange, monthStart, monthEnd]);
+  }, [expenses, month, year, selectedCategory, selectedPaymentMode, dateRange, monthStart, monthEnd]);
 
   const totalSpent = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
   const remaining = totalBudget - totalSpent;
@@ -194,6 +218,16 @@ export default function Analytics() {
     setSelectedPaymentMode('all');
     setDateRange({});
   };
+
+  if (loading) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>
@@ -497,12 +531,10 @@ export default function Analytics() {
           </Card>
         )}
 
-        {/* Empty State */}
         {filteredExpenses.length === 0 && (
           <Card>
-            <CardContent className="py-12 text-center">
-              <p className="text-muted-foreground">No expenses recorded for this period</p>
-              <p className="text-sm text-muted-foreground mt-1">Add your first expense to see analytics</p>
+            <CardContent className="py-8 text-center">
+              <p className="text-muted-foreground">No expenses for this period</p>
             </CardContent>
           </Card>
         )}

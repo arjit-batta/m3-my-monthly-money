@@ -1,6 +1,6 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { format } from 'date-fns';
-import { CalendarIcon, IndianRupee } from 'lucide-react';
+import { CalendarIcon, IndianRupee, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,8 +19,9 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { Label } from '@/components/ui/label';
-import { getCategories, getPaymentModes, addExpense, generateId } from '@/lib/storage';
+import { getCategories, getPaymentModes, addExpense } from '@/lib/database';
 import { useToast } from '@/hooks/use-toast';
+import { Category, PaymentMode } from '@/types/expense';
 
 const STORAGE_KEYS = {
   LAST_CATEGORY: 'expense-last-category',
@@ -42,9 +43,12 @@ function saveLastUsedValues(categoryId: string, paymentModeId: string) {
 export function ExpenseForm() {
   const { toast } = useToast();
   const amountInputRef = useRef<HTMLInputElement>(null);
-  const categories = useMemo(() => getCategories(), []);
-  const paymentModes = useMemo(() => getPaymentModes(), []);
-  const lastUsed = useMemo(() => getLastUsedValues(), []);
+  const lastUsed = getLastUsedValues();
+
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [paymentModes, setPaymentModes] = useState<PaymentMode[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
   const [amount, setAmount] = useState('');
   const [amountTouched, setAmountTouched] = useState(false);
@@ -57,10 +61,29 @@ export function ExpenseForm() {
   const [paymentModeTouched, setPaymentModeTouched] = useState(false);
   const [notes, setNotes] = useState('');
 
+  // Load data on mount
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [cats, modes] = await Promise.all([getCategories(), getPaymentModes()]);
+        setCategories(cats);
+        setPaymentModes(modes);
+      } catch (error) {
+        console.error('Failed to load form data:', error);
+        toast({ title: 'Failed to load data', variant: 'destructive' });
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, [toast]);
+
   // Auto-focus amount input on mount
   useEffect(() => {
-    amountInputRef.current?.focus();
-  }, []);
+    if (!loading) {
+      amountInputRef.current?.focus();
+    }
+  }, [loading]);
 
   const selectedCategory = categories.find((c) => c.id === categoryId);
   const subCategories = selectedCategory?.subCategories || [];
@@ -73,7 +96,7 @@ export function ExpenseForm() {
   const subCategoryError = subCategoryTouched && hasSubCategories && !subCategoryId ? 'Sub-category is required' : '';
   const paymentModeError = paymentModeTouched && !paymentModeId ? 'Payment mode is required' : '';
 
-  const isFormValid = useMemo(() => {
+  const isFormValid = (() => {
     const amountNum = parseFloat(amount);
     const subCategoryValid = !hasSubCategories || subCategoryId !== '';
     return (
@@ -83,7 +106,7 @@ export function ExpenseForm() {
       subCategoryValid &&
       paymentModeId !== ''
     );
-  }, [amount, date, categoryId, subCategoryId, paymentModeId, hasSubCategories]);
+  })();
 
   const handleCategoryChange = (value: string) => {
     setCategoryId(value);
@@ -92,7 +115,7 @@ export function ExpenseForm() {
     setSubCategoryTouched(false);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     // Touch all fields to show errors
     setAmountTouched(true);
     setCategoryTouched(true);
@@ -101,37 +124,50 @@ export function ExpenseForm() {
 
     if (!isFormValid) return;
 
-    const expense = {
-      id: generateId(),
-      amount: parseFloat(amount),
-      date: format(date, 'yyyy-MM-dd'),
-      categoryId,
-      subCategoryId: subCategoryId || '',
-      paymentModeId,
-      notes: notes.trim() || undefined,
-      createdAt: new Date().toISOString(),
-    };
+    setSubmitting(true);
+    try {
+      await addExpense({
+        amount: parseFloat(amount),
+        date: format(date, 'yyyy-MM-dd'),
+        categoryId,
+        subCategoryId: subCategoryId || '',
+        paymentModeId,
+        notes: notes.trim() || undefined,
+      });
+      
+      saveLastUsedValues(categoryId, paymentModeId);
 
-    addExpense(expense);
-    saveLastUsedValues(categoryId, paymentModeId);
+      toast({
+        title: 'Expense saved',
+        description: `₹${amount} added`,
+        duration: 2000,
+      });
 
-    toast({
-      title: 'Expense saved',
-      description: `₹${amount} added`,
-      duration: 2000,
-    });
+      // Reset form but keep category and payment mode
+      setAmount('');
+      setAmountTouched(false);
+      setDate(new Date());
+      setSubCategoryId('');
+      setSubCategoryTouched(false);
+      setNotes('');
 
-    // Reset form but keep category and payment mode
-    setAmount('');
-    setAmountTouched(false);
-    setDate(new Date());
-    setSubCategoryId('');
-    setSubCategoryTouched(false);
-    setNotes('');
-
-    // Refocus amount input
-    amountInputRef.current?.focus();
+      // Refocus amount input
+      amountInputRef.current?.focus();
+    } catch (error) {
+      console.error('Failed to save expense:', error);
+      toast({ title: 'Failed to save expense', variant: 'destructive' });
+    } finally {
+      setSubmitting(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">
@@ -275,10 +311,11 @@ export function ExpenseForm() {
       {/* Submit Button */}
       <Button
         onClick={handleSubmit}
-        disabled={!isFormValid}
+        disabled={!isFormValid || submitting}
         className="w-full text-base font-medium"
         size="lg"
       >
+        {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
         Save Expense
       </Button>
     </div>

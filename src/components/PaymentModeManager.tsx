@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Plus, Pencil, Trash2, Loader2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,8 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { getPaymentModes, addPaymentMode, updatePaymentMode, deletePaymentMode, getExpenses, generateId } from '@/lib/storage';
-import { PaymentMode, PaymentModeType } from '@/types/expense';
+import { getPaymentModes, addPaymentMode, updatePaymentMode, deletePaymentMode, getExpenses } from '@/lib/database';
+import { PaymentMode, PaymentModeType, Expense } from '@/types/expense';
 import { toast } from '@/hooks/use-toast';
 
 const PAYMENT_MODE_TYPES: { value: PaymentModeType; label: string }[] = [
@@ -19,18 +19,36 @@ const PAYMENT_MODE_TYPES: { value: PaymentModeType; label: string }[] = [
 ];
 
 export function PaymentModeManager() {
-  const [paymentModes, setPaymentModes] = useState(getPaymentModes);
+  const [paymentModes, setPaymentModes] = useState<PaymentMode[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isAddSheetOpen, setIsAddSheetOpen] = useState(false);
   const [isEditSheetOpen, setIsEditSheetOpen] = useState(false);
   const [editingMode, setEditingMode] = useState<PaymentMode | null>(null);
+  const [saving, setSaving] = useState(false);
   
   // Form states
   const [name, setName] = useState('');
   const [type, setType] = useState<PaymentModeType | ''>('');
 
-  const refreshPaymentModes = () => {
-    setPaymentModes(getPaymentModes());
-  };
+  const loadData = useCallback(async () => {
+    try {
+      const [modes, exps] = await Promise.all([
+        getPaymentModes(),
+        getExpenses(),
+      ]);
+      setPaymentModes(modes);
+      setExpenses(exps);
+    } catch (error) {
+      console.error('Failed to load payment modes:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const resetForm = () => {
     setName('');
@@ -49,55 +67,72 @@ export function PaymentModeManager() {
     setIsEditSheetOpen(true);
   };
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!name.trim()) {
       toast({ title: 'Name is required', variant: 'destructive' });
       return;
     }
 
-    const newMode: PaymentMode = {
-      id: generateId(),
-      name: name.trim(),
-      type: type || undefined,
-    };
-
-    addPaymentMode(newMode);
-    refreshPaymentModes();
-    setIsAddSheetOpen(false);
-    resetForm();
-    toast({ title: 'Payment mode added' });
+    setSaving(true);
+    try {
+      await addPaymentMode({
+        name: name.trim(),
+        type: type || undefined,
+      });
+      await loadData();
+      setIsAddSheetOpen(false);
+      resetForm();
+      toast({ title: 'Payment mode added' });
+    } catch (error) {
+      console.error('Failed to add payment mode:', error);
+      toast({ title: 'Failed to add payment mode', variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleUpdate = () => {
+  const handleUpdate = async () => {
     if (!editingMode) return;
     if (!name.trim()) {
       toast({ title: 'Name is required', variant: 'destructive' });
       return;
     }
 
-    updatePaymentMode(editingMode.id, {
-      name: name.trim(),
-      type: type || undefined,
-    });
-    refreshPaymentModes();
-    setIsEditSheetOpen(false);
-    setEditingMode(null);
-    resetForm();
-    toast({ title: 'Payment mode updated' });
+    setSaving(true);
+    try {
+      await updatePaymentMode(editingMode.id, {
+        name: name.trim(),
+        type: type || undefined,
+      });
+      await loadData();
+      setIsEditSheetOpen(false);
+      setEditingMode(null);
+      resetForm();
+      toast({ title: 'Payment mode updated' });
+    } catch (error) {
+      console.error('Failed to update payment mode:', error);
+      toast({ title: 'Failed to update payment mode', variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const getModeDependencies = (modeId: string) => {
-    const expenses = getExpenses();
     const expenseCount = expenses.filter(e => e.paymentModeId === modeId).length;
     return { expenseCount };
   };
 
-  const handleDelete = (modeId: string) => {
-    deletePaymentMode(modeId);
-    refreshPaymentModes();
-    setIsEditSheetOpen(false);
-    setEditingMode(null);
-    toast({ title: 'Payment mode deleted' });
+  const handleDelete = async (modeId: string) => {
+    try {
+      await deletePaymentMode(modeId);
+      await loadData();
+      setIsEditSheetOpen(false);
+      setEditingMode(null);
+      toast({ title: 'Payment mode deleted' });
+    } catch (error) {
+      console.error('Failed to delete payment mode:', error);
+      toast({ title: 'Failed to delete payment mode', variant: 'destructive' });
+    }
   };
 
   const getTypeLabel = (type?: PaymentModeType) => {
@@ -105,6 +140,14 @@ export function PaymentModeManager() {
     const found = PAYMENT_MODE_TYPES.find(t => t.value === type);
     return found?.label || type;
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -212,7 +255,8 @@ export function PaymentModeManager() {
                 </SelectContent>
               </Select>
             </div>
-            <Button onClick={handleAdd} className="w-full">
+            <Button onClick={handleAdd} className="w-full" disabled={saving}>
+              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Add Payment Mode
             </Button>
           </div>
@@ -249,7 +293,8 @@ export function PaymentModeManager() {
                 </SelectContent>
               </Select>
             </div>
-            <Button onClick={handleUpdate} className="w-full">
+            <Button onClick={handleUpdate} className="w-full" disabled={saving}>
+              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Save Changes
             </Button>
           </div>
