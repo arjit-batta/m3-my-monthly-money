@@ -23,6 +23,7 @@ import { getCategories, getPaymentModes, addExpense } from '@/lib/database';
 import { useToast } from '@/hooks/use-toast';
 import { Category, PaymentMode } from '@/types/expense';
 import { LoadingState, ErrorState } from '@/components/LoadingError';
+import { withErrorHandling, getErrorMessage, isNetworkError } from '@/lib/db-utils';
 
 const STORAGE_KEYS = {
   LAST_CATEGORY: 'expense-last-category',
@@ -130,16 +131,22 @@ export function ExpenseForm() {
     if (!isFormValid) return;
 
     setSubmitting(true);
-    try {
-      await addExpense({
-        amount: parseFloat(amount),
-        date: format(date, 'yyyy-MM-dd'),
-        categoryId,
-        subCategoryId: subCategoryId || '',
-        paymentModeId,
-        notes: notes.trim() || undefined,
-      });
-      
+    
+    // Capture form values before submission to prevent state corruption
+    const expenseData = {
+      amount: parseFloat(amount),
+      date: format(date, 'yyyy-MM-dd'),
+      categoryId,
+      subCategoryId: subCategoryId || '',
+      paymentModeId,
+      notes: notes.trim() || undefined,
+    };
+
+    const result = await withErrorHandling(() => addExpense(expenseData));
+    
+    setSubmitting(false);
+
+    if (result.success === true) {
       saveLastUsedValues(categoryId, paymentModeId);
 
       toast({
@@ -158,11 +165,15 @@ export function ExpenseForm() {
 
       // Refocus amount input
       amountInputRef.current?.focus();
-    } catch (error) {
-      console.error('Failed to save expense:', error);
-      toast({ title: 'Failed to save expense', variant: 'destructive' });
-    } finally {
-      setSubmitting(false);
+    } else {
+      // Handle failure - form state is preserved for retry
+      const failedResult = result as { success: false; error: string; isNetworkError: boolean };
+      toast({ 
+        title: failedResult.isNetworkError ? 'Connection Error' : 'Failed to save expense',
+        description: failedResult.error,
+        variant: 'destructive',
+        duration: 4000,
+      });
     }
   };
 

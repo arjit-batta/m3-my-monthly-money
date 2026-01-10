@@ -21,6 +21,7 @@ import {
 import { Category, Expense, Budget } from '@/types/expense';
 import { toast } from '@/hooks/use-toast';
 import { LoadingState, ErrorState } from '@/components/LoadingError';
+import { withErrorHandling } from '@/lib/db-utils';
 
 const EMOJI_OPTIONS = ['🍔', '🚗', '🛒', '💡', '🎬', '💊', '📚', '👤', '🏠', '✈️', '🎮', '💰', '🎁', '📱', '🏋️'];
 const COLOR_OPTIONS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#14b8a6', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899', '#6b7280'];
@@ -114,26 +115,29 @@ export function CategoryManager() {
     }
 
     setSaving(true);
-    try {
-      if (editingCategory) {
-        await updateCategory(editingCategory.id, { name: categoryForm.name.trim(), icon: categoryForm.icon });
-        toast({ title: 'Category updated' });
-      } else {
-        await addCategory({
+    
+    const result = editingCategory
+      ? await withErrorHandling(() => updateCategory(editingCategory.id, { name: categoryForm.name.trim(), icon: categoryForm.icon }))
+      : await withErrorHandling(() => addCategory({
           name: categoryForm.name.trim(),
           icon: categoryForm.icon,
           subCategories: [{ id: '', name: 'General' }],
-        });
-        toast({ title: 'Category added' });
-      }
-      
+        }));
+    
+    setSaving(false);
+
+    if (result.success === true) {
+      toast({ title: editingCategory ? 'Category updated' : 'Category added' });
       await loadData();
       setIsCategorySheetOpen(false);
-    } catch (error) {
-      console.error('Failed to save category:', error);
-      toast({ title: 'Failed to save category', variant: 'destructive' });
-    } finally {
-      setSaving(false);
+    } else {
+      const failedResult = result as { success: false; error: string; isNetworkError: boolean };
+      toast({ 
+        title: failedResult.isNetworkError ? 'Connection Error' : 'Failed to save category',
+        description: failedResult.error,
+        variant: 'destructive',
+        duration: 4000,
+      });
     }
   };
 
@@ -147,13 +151,18 @@ export function CategoryManager() {
       return;
     }
 
-    try {
-      await deleteCategory(deleteDialog.categoryId);
+    const result = await withErrorHandling(() => deleteCategory(deleteDialog.categoryId));
+    
+    if (result.success === true) {
       await loadData();
       toast({ title: 'Category deleted' });
-    } catch (error) {
-      console.error('Failed to delete category:', error);
-      toast({ title: 'Failed to delete category', variant: 'destructive' });
+    } else {
+      const failedResult = result as { success: false; error: string; isNetworkError: boolean };
+      toast({ 
+        title: failedResult.isNetworkError ? 'Connection Error' : 'Failed to delete category',
+        description: failedResult.error,
+        variant: 'destructive' 
+      });
     }
     setDeleteDialog(null);
   };
@@ -178,22 +187,25 @@ export function CategoryManager() {
     }
 
     setSaving(true);
-    try {
-      if (editingSubCategory) {
-        await updateSubCategory(editingSubCategory.subId, subCategoryForm.name.trim());
-        toast({ title: 'Sub-category updated' });
-      } else {
-        await addSubCategory(subCategoryForm.categoryId, subCategoryForm.name.trim());
-        toast({ title: 'Sub-category added' });
-      }
-      
+    
+    const result = editingSubCategory
+      ? await withErrorHandling(() => updateSubCategory(editingSubCategory.subId, subCategoryForm.name.trim()))
+      : await withErrorHandling(() => addSubCategory(subCategoryForm.categoryId, subCategoryForm.name.trim()));
+    
+    setSaving(false);
+
+    if (result.success === true) {
+      toast({ title: editingSubCategory ? 'Sub-category updated' : 'Sub-category added' });
       await loadData();
       setIsSubCategorySheetOpen(false);
-    } catch (error) {
-      console.error('Failed to save sub-category:', error);
-      toast({ title: 'Failed to save sub-category', variant: 'destructive' });
-    } finally {
-      setSaving(false);
+    } else {
+      const failedResult = result as { success: false; error: string; isNetworkError: boolean };
+      toast({ 
+        title: failedResult.isNetworkError ? 'Connection Error' : 'Failed to save sub-category',
+        description: failedResult.error,
+        variant: 'destructive',
+        duration: 4000,
+      });
     }
   };
 
@@ -217,13 +229,18 @@ export function CategoryManager() {
       return;
     }
 
-    try {
-      await deleteSubCategory(deleteDialog.subId);
+    const result = await withErrorHandling(() => deleteSubCategory(deleteDialog.subId!));
+    
+    if (result.success === true) {
       await loadData();
       toast({ title: 'Sub-category deleted' });
-    } catch (error) {
-      console.error('Failed to delete sub-category:', error);
-      toast({ title: 'Failed to delete sub-category', variant: 'destructive' });
+    } else {
+      const failedResult = result as { success: false; error: string; isNetworkError: boolean };
+      toast({ 
+        title: failedResult.isNetworkError ? 'Connection Error' : 'Failed to delete sub-category',
+        description: failedResult.error,
+        variant: 'destructive' 
+      });
     }
     setDeleteDialog(null);
   };
