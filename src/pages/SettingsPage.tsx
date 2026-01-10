@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils';
 import { CategoryManager } from '@/components/CategoryManager';
 import { PaymentModeManager } from '@/components/PaymentModeManager';
 import { useAuth } from '@/hooks/useAuth';
+import { LoadingState, ErrorState } from '@/components/LoadingError';
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-IN', {
@@ -35,12 +36,14 @@ export default function SettingsPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [paymentModes, setPaymentModes] = useState<PaymentMode[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [editForm, setEditForm] = useState<Partial<Expense>>({});
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const loadData = useCallback(async () => {
+    setError(null);
     try {
       const [exps, cats, modes] = await Promise.all([
         getExpenses(),
@@ -50,8 +53,9 @@ export default function SettingsPage() {
       setExpenses(exps);
       setCategories(cats);
       setPaymentModes(modes);
-    } catch (error) {
-      console.error('Failed to load data:', error);
+    } catch (err) {
+      console.error('Failed to load data:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load data');
     } finally {
       setLoading(false);
     }
@@ -188,8 +192,17 @@ export default function SettingsPage() {
   if (loading) {
     return (
       <AppLayout>
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <LoadingState className="py-20" />
+      </AppLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <AppLayout>
+        <div className="pt-6">
+          <h1 className="text-xl font-semibold mb-4">Settings</h1>
+          <ErrorState message={error} onRetry={loadData} />
         </div>
       </AppLayout>
     );

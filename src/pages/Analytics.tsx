@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, eachWeekOfInterval, startOfMonth, endOfMonth, isSameDay, isWithinInterval, parseISO } from 'date-fns';
-import { ChevronLeft, ChevronRight, Filter, X, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Filter, X } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { AppLayout } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,7 @@ import { useBudgetData } from '@/hooks/useBudgetData';
 import { getExpenses, getCategories, getPaymentModes } from '@/lib/database';
 import { cn } from '@/lib/utils';
 import { Category, PaymentMode, Expense } from '@/types/expense';
+import { LoadingState, ErrorState } from '@/components/LoadingError';
 
 const COLORS = ['#2563eb', '#16a34a', '#ea580c', '#8b5cf6', '#ec4899', '#14b8a6', '#f59e0b', '#6366f1'];
 
@@ -50,27 +51,32 @@ export default function Analytics() {
   const [paymentModes, setPaymentModes] = useState<PaymentMode[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const { categories: budgetCategories, totalBudget } = useBudgetData(month, year);
 
   // Load data
-  useEffect(() => {
-    async function loadData() {
-      try {
-        const [cats, modes, exps] = await Promise.all([
-          getCategories(),
-          getPaymentModes(),
-          getExpenses(),
-        ]);
-        setAllCategories(cats);
-        setPaymentModes(modes);
-        setExpenses(exps);
-      } catch (error) {
-        console.error('Failed to load analytics data:', error);
-      } finally {
-        setLoading(false);
-      }
+  const loadData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [cats, modes, exps] = await Promise.all([
+        getCategories(),
+        getPaymentModes(),
+        getExpenses(),
+      ]);
+      setAllCategories(cats);
+      setPaymentModes(modes);
+      setExpenses(exps);
+    } catch (err) {
+      console.error('Failed to load analytics data:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load analytics data');
+    } finally {
+      setLoading(false);
     }
+  };
+
+  useEffect(() => {
     loadData();
   }, []);
 
@@ -222,8 +228,17 @@ export default function Analytics() {
   if (loading) {
     return (
       <AppLayout>
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <LoadingState className="py-20" />
+      </AppLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <AppLayout>
+        <div className="pt-6">
+          <h1 className="text-xl font-semibold mb-4">Analytics</h1>
+          <ErrorState message={error} onRetry={loadData} />
         </div>
       </AppLayout>
     );

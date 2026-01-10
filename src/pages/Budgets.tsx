@@ -1,11 +1,12 @@
 import { useState, useCallback } from 'react';
 import { format } from 'date-fns';
-import { ChevronLeft, ChevronRight, Plus, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { AppLayout } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
 import { BudgetCard } from '@/components/BudgetCard';
 import { BudgetEditor } from '@/components/BudgetEditor';
 import { useBudgetData } from '@/hooks/useBudgetData';
+import { LoadingState, ErrorState, EmptyState } from '@/components/LoadingError';
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-IN', {
@@ -28,7 +29,7 @@ export default function Budgets() {
   const [editSubCategoryId, setEditSubCategoryId] = useState('');
   const [editAmount, setEditAmount] = useState(0);
 
-  const { categories, totalBudget, totalSpent, remaining, loading } = useBudgetData(month, year, refreshKey);
+  const { categories, totalBudget, totalSpent, remaining, loading, error, refetch } = useBudgetData(month, year, refreshKey);
 
   const goToPrevMonth = () => {
     if (month === 1) {
@@ -86,54 +87,61 @@ export default function Budgets() {
           </div>
         </div>
 
-        {/* Summary card */}
-        <div className="rounded-xl bg-primary/10 p-4">
-          <div className="grid grid-cols-3 gap-4 text-center">
-            <div>
-              <p className="text-xs text-muted-foreground">Budget</p>
-              <p className="text-lg font-semibold">{formatCurrency(totalBudget)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Spent</p>
-              <p className="text-lg font-semibold">{formatCurrency(totalSpent)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Remaining</p>
-              <p className={`text-lg font-semibold ${isOverBudget ? 'text-destructive' : ''}`}>
-                {formatCurrency(remaining)}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Add budget button */}
-        <Button onClick={handleAddBudget} className="w-full" variant="outline">
-          <Plus className="mr-2 h-4 w-4" />
-          Add Budget
-        </Button>
+        {/* Error state */}
+        {error && !loading && (
+          <ErrorState message={error} onRetry={refetch} />
+        )}
 
         {/* Loading state */}
-        {loading && (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
-        )}
+        {loading && <LoadingState />}
 
-        {/* Category cards */}
-        {!loading && (
-          <div className="space-y-3">
-            {categories.map((category) => (
-              <BudgetCard
-                key={`${category.categoryId}-${refreshKey}`}
-                category={category}
-                onEditBudget={handleEditBudget}
+        {/* Content when loaded successfully */}
+        {!loading && !error && (
+          <>
+            {/* Summary card */}
+            <div className="rounded-xl bg-primary/10 p-4">
+              <div className="grid grid-cols-3 gap-4 text-center">
+                <div>
+                  <p className="text-xs text-muted-foreground">Budget</p>
+                  <p className="text-lg font-semibold">{formatCurrency(totalBudget)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Spent</p>
+                  <p className="text-lg font-semibold">{formatCurrency(totalSpent)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Remaining</p>
+                  <p className={`text-lg font-semibold ${isOverBudget ? 'text-destructive' : ''}`}>
+                    {formatCurrency(remaining)}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Add budget button */}
+            <Button onClick={handleAddBudget} className="w-full" variant="outline">
+              <Plus className="mr-2 h-4 w-4" />
+              Add Budget
+            </Button>
+
+            {/* Category cards */}
+            {categories.length > 0 ? (
+              <div className="space-y-3">
+                {categories.map((category) => (
+                  <BudgetCard
+                    key={`${category.categoryId}-${refreshKey}`}
+                    category={category}
+                    onEditBudget={handleEditBudget}
+                  />
+                ))}
+              </div>
+            ) : (
+              <EmptyState 
+                title="No categories found" 
+                description="Add categories in Settings to start budgeting" 
               />
-            ))}
-          </div>
-        )}
-
-        {!loading && categories.length === 0 && (
-          <p className="text-center text-muted-foreground">No categories found</p>
+            )}
+          </>
         )}
       </div>
 
