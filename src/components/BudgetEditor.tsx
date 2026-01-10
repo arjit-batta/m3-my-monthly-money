@@ -19,6 +19,7 @@ import {
 import { getCategories, setBudget } from '@/lib/database';
 import { useToast } from '@/hooks/use-toast';
 import { Category } from '@/types/expense';
+import { LoadingState, ErrorState } from '@/components/LoadingError';
 
 interface BudgetEditorProps {
   open: boolean;
@@ -44,19 +45,30 @@ export function BudgetEditor({
   const { toast } = useToast();
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [categoryId, setCategoryId] = useState(initialCategoryId);
   const [subCategoryId, setSubCategoryId] = useState(initialSubCategoryId);
   const [amount, setAmount] = useState(initialAmount >= 0 ? String(initialAmount) : '');
 
   // Load categories
+  const loadCategories = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const cats = await getCategories();
+      setCategories(cats);
+    } catch (err) {
+      console.error('Failed to load categories:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load categories');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (open) {
-      setLoading(true);
-      getCategories()
-        .then(setCategories)
-        .catch(console.error)
-        .finally(() => setLoading(false));
+      loadCategories();
     }
   }, [open]);
 
@@ -117,9 +129,9 @@ export function BudgetEditor({
         </DialogHeader>
 
         {loading ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
+          <LoadingState className="py-8" />
+        ) : error ? (
+          <ErrorState message={error} onRetry={loadCategories} className="" />
         ) : (
           <div className="space-y-4 pt-2">
             {/* Category */}

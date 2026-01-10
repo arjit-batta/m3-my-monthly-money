@@ -20,6 +20,7 @@ import {
 } from '@/lib/database';
 import { Category, Expense, Budget } from '@/types/expense';
 import { toast } from '@/hooks/use-toast';
+import { LoadingState, ErrorState } from '@/components/LoadingError';
 
 const EMOJI_OPTIONS = ['🍔', '🚗', '🛒', '💡', '🎬', '💊', '📚', '👤', '🏠', '✈️', '🎮', '💰', '🎁', '📱', '🏋️'];
 const COLOR_OPTIONS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#14b8a6', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899', '#6b7280'];
@@ -29,6 +30,7 @@ export function CategoryManager() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   
   // Category sheet
@@ -46,6 +48,7 @@ export function CategoryManager() {
   const [deleteDialog, setDeleteDialog] = useState<{ type: 'category' | 'subcategory'; categoryId: string; subId?: string } | null>(null);
 
   const loadData = useCallback(async () => {
+    setError(null);
     try {
       const [cats, exps, budgs] = await Promise.all([
         getCategories(),
@@ -55,8 +58,9 @@ export function CategoryManager() {
       setCategories(cats);
       setExpenses(exps);
       setBudgets(budgs);
-    } catch (error) {
-      console.error('Failed to load categories:', error);
+    } catch (err) {
+      console.error('Failed to load categories:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load categories');
     } finally {
       setLoading(false);
     }
@@ -225,11 +229,11 @@ export function CategoryManager() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <LoadingState />;
+  }
+
+  if (error) {
+    return <ErrorState message={error} onRetry={loadData} />;
   }
 
   return (

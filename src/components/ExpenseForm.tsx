@@ -22,6 +22,7 @@ import { Label } from '@/components/ui/label';
 import { getCategories, getPaymentModes, addExpense } from '@/lib/database';
 import { useToast } from '@/hooks/use-toast';
 import { Category, PaymentMode } from '@/types/expense';
+import { LoadingState, ErrorState } from '@/components/LoadingError';
 
 const STORAGE_KEYS = {
   LAST_CATEGORY: 'expense-last-category',
@@ -48,6 +49,7 @@ export function ExpenseForm() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [paymentModes, setPaymentModes] = useState<PaymentMode[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const [amount, setAmount] = useState('');
@@ -62,21 +64,24 @@ export function ExpenseForm() {
   const [notes, setNotes] = useState('');
 
   // Load data on mount
-  useEffect(() => {
-    async function loadData() {
-      try {
-        const [cats, modes] = await Promise.all([getCategories(), getPaymentModes()]);
-        setCategories(cats);
-        setPaymentModes(modes);
-      } catch (error) {
-        console.error('Failed to load form data:', error);
-        toast({ title: 'Failed to load data', variant: 'destructive' });
-      } finally {
-        setLoading(false);
-      }
+  const loadData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [cats, modes] = await Promise.all([getCategories(), getPaymentModes()]);
+      setCategories(cats);
+      setPaymentModes(modes);
+    } catch (err) {
+      console.error('Failed to load form data:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load form data');
+    } finally {
+      setLoading(false);
     }
+  };
+
+  useEffect(() => {
     loadData();
-  }, [toast]);
+  }, []);
 
   // Auto-focus amount input on mount
   useEffect(() => {
@@ -162,11 +167,11 @@ export function ExpenseForm() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <LoadingState />;
+  }
+
+  if (error) {
+    return <ErrorState message={error} onRetry={loadData} />;
   }
 
   return (

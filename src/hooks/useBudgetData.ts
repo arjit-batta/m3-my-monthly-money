@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getCategories, getExpenses, getBudgets } from '@/lib/database';
-import { CategorySpending, SubCategorySpending, Category, Expense, Budget } from '@/types/expense';
+import { CategorySpending, SubCategorySpending } from '@/types/expense';
 
 export function useBudgetData(month: number, year: number, refreshKey: number = 0) {
   const [data, setData] = useState<{
@@ -15,8 +15,10 @@ export function useBudgetData(month: number, year: number, refreshKey: number = 
     remaining: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
+    setError(null);
     try {
       const [categories, expenses, budgets] = await Promise.all([
         getCategories(),
@@ -88,8 +90,9 @@ export function useBudgetData(month: number, year: number, refreshKey: number = 
         totalSpent,
         remaining: totalBudget - totalSpent,
       });
-    } catch (error) {
-      console.error('Failed to fetch budget data:', error);
+    } catch (err) {
+      console.error('Failed to fetch budget data:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load budget data');
     } finally {
       setLoading(false);
     }
@@ -100,5 +103,5 @@ export function useBudgetData(month: number, year: number, refreshKey: number = 
     fetchData();
   }, [fetchData, refreshKey]);
 
-  return { ...data, loading, refetch: fetchData };
+  return { ...data, loading, error, refetch: fetchData };
 }

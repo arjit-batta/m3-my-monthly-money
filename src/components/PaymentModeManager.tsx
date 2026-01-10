@@ -10,6 +10,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { getPaymentModes, addPaymentMode, updatePaymentMode, deletePaymentMode, getExpenses } from '@/lib/database';
 import { PaymentMode, PaymentModeType, Expense } from '@/types/expense';
 import { toast } from '@/hooks/use-toast';
+import { LoadingState, ErrorState } from '@/components/LoadingError';
 
 const PAYMENT_MODE_TYPES: { value: PaymentModeType; label: string }[] = [
   { value: 'credit_card', label: 'Credit Card' },
@@ -22,6 +23,7 @@ export function PaymentModeManager() {
   const [paymentModes, setPaymentModes] = useState<PaymentMode[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isAddSheetOpen, setIsAddSheetOpen] = useState(false);
   const [isEditSheetOpen, setIsEditSheetOpen] = useState(false);
   const [editingMode, setEditingMode] = useState<PaymentMode | null>(null);
@@ -32,6 +34,7 @@ export function PaymentModeManager() {
   const [type, setType] = useState<PaymentModeType | ''>('');
 
   const loadData = useCallback(async () => {
+    setError(null);
     try {
       const [modes, exps] = await Promise.all([
         getPaymentModes(),
@@ -39,8 +42,9 @@ export function PaymentModeManager() {
       ]);
       setPaymentModes(modes);
       setExpenses(exps);
-    } catch (error) {
-      console.error('Failed to load payment modes:', error);
+    } catch (err) {
+      console.error('Failed to load payment modes:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load payment modes');
     } finally {
       setLoading(false);
     }
@@ -142,11 +146,11 @@ export function PaymentModeManager() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <LoadingState />;
+  }
+
+  if (error) {
+    return <ErrorState message={error} onRetry={loadData} />;
   }
 
   return (
