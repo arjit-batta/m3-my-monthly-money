@@ -11,6 +11,7 @@ import { getPaymentModes, addPaymentMode, updatePaymentMode, deletePaymentMode, 
 import { PaymentMode, PaymentModeType, Expense } from '@/types/expense';
 import { toast } from '@/hooks/use-toast';
 import { LoadingState, ErrorState } from '@/components/LoadingError';
+import { withErrorHandling } from '@/lib/db-utils';
 
 const PAYMENT_MODE_TYPES: { value: PaymentModeType; label: string }[] = [
   { value: 'credit_card', label: 'Credit Card' },
@@ -78,20 +79,27 @@ export function PaymentModeManager() {
     }
 
     setSaving(true);
-    try {
-      await addPaymentMode({
-        name: name.trim(),
-        type: type || undefined,
-      });
+    
+    const result = await withErrorHandling(() => addPaymentMode({
+      name: name.trim(),
+      type: type || undefined,
+    }));
+    
+    setSaving(false);
+
+    if (result.success === true) {
       await loadData();
       setIsAddSheetOpen(false);
       resetForm();
       toast({ title: 'Payment mode added' });
-    } catch (error) {
-      console.error('Failed to add payment mode:', error);
-      toast({ title: 'Failed to add payment mode', variant: 'destructive' });
-    } finally {
-      setSaving(false);
+    } else {
+      const failedResult = result as { success: false; error: string; isNetworkError: boolean };
+      toast({ 
+        title: failedResult.isNetworkError ? 'Connection Error' : 'Failed to add payment mode',
+        description: failedResult.error,
+        variant: 'destructive',
+        duration: 4000,
+      });
     }
   };
 
@@ -103,21 +111,28 @@ export function PaymentModeManager() {
     }
 
     setSaving(true);
-    try {
-      await updatePaymentMode(editingMode.id, {
-        name: name.trim(),
-        type: type || undefined,
-      });
+    
+    const result = await withErrorHandling(() => updatePaymentMode(editingMode.id, {
+      name: name.trim(),
+      type: type || undefined,
+    }));
+    
+    setSaving(false);
+
+    if (result.success === true) {
       await loadData();
       setIsEditSheetOpen(false);
       setEditingMode(null);
       resetForm();
       toast({ title: 'Payment mode updated' });
-    } catch (error) {
-      console.error('Failed to update payment mode:', error);
-      toast({ title: 'Failed to update payment mode', variant: 'destructive' });
-    } finally {
-      setSaving(false);
+    } else {
+      const failedResult = result as { success: false; error: string; isNetworkError: boolean };
+      toast({ 
+        title: failedResult.isNetworkError ? 'Connection Error' : 'Failed to update payment mode',
+        description: failedResult.error,
+        variant: 'destructive',
+        duration: 4000,
+      });
     }
   };
 
@@ -127,15 +142,20 @@ export function PaymentModeManager() {
   };
 
   const handleDelete = async (modeId: string) => {
-    try {
-      await deletePaymentMode(modeId);
+    const result = await withErrorHandling(() => deletePaymentMode(modeId));
+    
+    if (result.success === true) {
       await loadData();
       setIsEditSheetOpen(false);
       setEditingMode(null);
       toast({ title: 'Payment mode deleted' });
-    } catch (error) {
-      console.error('Failed to delete payment mode:', error);
-      toast({ title: 'Failed to delete payment mode', variant: 'destructive' });
+    } else {
+      const failedResult = result as { success: false; error: string; isNetworkError: boolean };
+      toast({ 
+        title: failedResult.isNetworkError ? 'Connection Error' : 'Failed to delete payment mode',
+        description: failedResult.error,
+        variant: 'destructive' 
+      });
     }
   };
 

@@ -20,6 +20,7 @@ import { getCategories, setBudget } from '@/lib/database';
 import { useToast } from '@/hooks/use-toast';
 import { Category } from '@/types/expense';
 import { LoadingState, ErrorState } from '@/components/LoadingError';
+import { withErrorHandling } from '@/lib/db-utils';
 
 interface BudgetEditorProps {
   open: boolean;
@@ -95,27 +96,29 @@ export function BudgetEditor({
     if (!isValid) return;
 
     setSaving(true);
-    try {
-      await setBudget({
-        categoryId,
-        subCategoryId,
-        month,
-        year,
-        amount: parseFloat(amount),
-      });
+    
+    const result = await withErrorHandling(() => setBudget({
+      categoryId,
+      subCategoryId,
+      month,
+      year,
+      amount: parseFloat(amount),
+    }));
+    
+    setSaving(false);
 
-      toast({
-        title: 'Budget saved',
-        duration: 2000,
-      });
-
+    if (result.success === true) {
+      toast({ title: 'Budget saved', duration: 2000 });
       onOpenChange(false);
       onSave?.();
-    } catch (error) {
-      console.error('Failed to save budget:', error);
-      toast({ title: 'Failed to save budget', variant: 'destructive' });
-    } finally {
-      setSaving(false);
+    } else {
+      const failedResult = result as { success: false; error: string; isNetworkError: boolean };
+      toast({ 
+        title: failedResult.isNetworkError ? 'Connection Error' : 'Failed to save budget',
+        description: failedResult.error,
+        variant: 'destructive',
+        duration: 4000,
+      });
     }
   };
 
