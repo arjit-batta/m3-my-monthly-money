@@ -229,12 +229,39 @@ export async function updateCategory(categoryId: string, updates: { name?: strin
 }
 
 export async function deleteCategory(categoryId: string): Promise<boolean> {
+  // Check if category has sub-categories
+  const { data: subCategories, error: subCheckError } = await supabase
+    .from('sub_categories')
+    .select('id')
+    .eq('category_id', categoryId)
+    .limit(1);
+  
+  if (subCheckError) throw subCheckError;
+  
+  if (subCategories && subCategories.length > 0) {
+    throw new Error('Cannot delete category: it still has sub-categories. Please delete all sub-categories first.');
+  }
+  
+  // Check if category is used by any expenses
+  const { data: expenses, error: expCheckError } = await supabase
+    .from('expenses')
+    .select('id')
+    .eq('category_id', categoryId)
+    .limit(1);
+  
+  if (expCheckError) throw expCheckError;
+  
+  if (expenses && expenses.length > 0) {
+    throw new Error('Cannot delete category: it is used by existing expenses. Please reassign or delete those expenses first.');
+  }
+  
   const { error } = await supabase
     .from('categories')
     .delete()
     .eq('id', categoryId);
   
-  return !error;
+  if (error) throw error;
+  return true;
 }
 
 // ============= Sub-Categories =============
@@ -262,12 +289,26 @@ export async function updateSubCategory(subCategoryId: string, name: string): Pr
 }
 
 export async function deleteSubCategory(subCategoryId: string): Promise<boolean> {
+  // Check if sub-category is used by any expenses
+  const { data: expenses, error: checkError } = await supabase
+    .from('expenses')
+    .select('id')
+    .eq('sub_category_id', subCategoryId)
+    .limit(1);
+  
+  if (checkError) throw checkError;
+  
+  if (expenses && expenses.length > 0) {
+    throw new Error('Cannot delete sub-category: it is used by existing expenses. Please reassign or delete those expenses first.');
+  }
+  
   const { error } = await supabase
     .from('sub_categories')
     .delete()
     .eq('id', subCategoryId);
   
-  return !error;
+  if (error) throw error;
+  return true;
 }
 
 // ============= Expenses =============
@@ -530,10 +571,24 @@ export async function updatePaymentMode(modeId: string, updates: Partial<Payment
 }
 
 export async function deletePaymentMode(modeId: string): Promise<boolean> {
+  // Check if payment mode is used by any expenses
+  const { data: expenses, error: checkError } = await supabase
+    .from('expenses')
+    .select('id')
+    .eq('payment_mode_id', modeId)
+    .limit(1);
+  
+  if (checkError) throw checkError;
+  
+  if (expenses && expenses.length > 0) {
+    throw new Error('Cannot delete payment mode: it is used by existing expenses. Please reassign or delete those expenses first.');
+  }
+  
   const { error } = await supabase
     .from('payment_modes')
     .delete()
     .eq('id', modeId);
   
-  return !error;
+  if (error) throw error;
+  return true;
 }
