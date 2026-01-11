@@ -15,11 +15,15 @@ export function generateId(): string {
   return crypto.randomUUID();
 }
 
+// Track initialization state per user to prevent concurrent calls
+const initializationInProgress = new Map<string, Promise<void>>();
+
 // ============= Categories =============
 
 export async function getCategories(): Promise<Category[]> {
   const userId = await getUserId();
   
+  // Check if categories exist
   const { data: categories, error } = await supabase
     .from('categories')
     .select('*')
@@ -27,10 +31,32 @@ export async function getCategories(): Promise<Category[]> {
   
   if (error) throw error;
   
-  // If no categories exist, initialize with defaults
+  // If no categories exist, initialize with defaults (with concurrency protection)
   if (!categories || categories.length === 0) {
-    await initializeDefaultCategories(userId);
-    return getCategories();
+    await ensureDefaultCategoriesInitialized(userId);
+    
+    // Re-fetch after initialization
+    const { data: newCategories, error: refetchError } = await supabase
+      .from('categories')
+      .select('*')
+      .eq('user_id', userId);
+    
+    if (refetchError) throw refetchError;
+    
+    const { data: subCategories } = await supabase
+      .from('sub_categories')
+      .select('*')
+      .eq('user_id', userId);
+    
+    return (newCategories || []).map(cat => ({
+      id: cat.id,
+      name: cat.name,
+      icon: cat.icon,
+      color: '',
+      subCategories: (subCategories || [])
+        .filter(sc => sc.category_id === cat.id)
+        .map(sc => ({ id: sc.id, name: sc.name })),
+    }));
   }
   
   // Fetch sub-categories for each category
@@ -46,35 +72,121 @@ export async function getCategories(): Promise<Category[]> {
     id: cat.id,
     name: cat.name,
     icon: cat.icon,
-    color: '', // Color is not stored in DB, use default or derive
+    color: '',
     subCategories: (subCategories || [])
       .filter(sc => sc.category_id === cat.id)
       .map(sc => ({ id: sc.id, name: sc.name })),
   }));
 }
 
-async function initializeDefaultCategories(userId: string): Promise<void> {
+/**
+ * Ensures default categories are initialized exactly once per user.
+ * Uses in-memory locking to prevent concurrent initialization attempts.
+ * Skips initialization if categories already exist (doesn't overwrite user data).
+ */
+async function ensureDefaultCategoriesInitialized(userId: string): Promise<void> {
+  const cacheKey = `categories_${userId}`;
+  
+  // If initialization is already in progress, wait for it
+  const existingInit = initializationInProgress.get(cacheKey);
+  if (existingInit) {
+    await existingInit;
+    return;
+  }
+  
+  // Start initialization with lock
+  const initPromise = initializeDefaultCategoriesOnce(userId);
+  initializationInProgress.set(cacheKey, initPromise);
+  
+  try {
+    await initPromise;
+  } finally {
+    initializationInProgress.delete(cacheKey);
+  }
+}
+
+/**
+ * Actually performs the initialization, checking again for existing data
+ * to handle race conditions at the database level.
+ */
+async function initializeDefaultCategoriesOnce(userId: string): Promise<void> {
+  // Double-check: another request may have created categories while we were waiting
+  const { data: existingCategories } = await supabase
+    .from('categories')
+    .select('id')
+    .eq('user_id', userId)
+    .limit(1);
+  
+  if (existingCategories && existingCategories.length > 0) {
+    // Categories already exist, don't overwrite
+    return;
+  }
+  
+  // Insert categories one by one with conflict handling
   for (const cat of DEFAULT_CATEGORIES) {
-    const { data: newCat, error: catError } = await supabase
+    // Use a deterministic approach - check if category with same name exists
+    const { data: existingCat } = await supabase
       .from('categories')
-      .insert({ user_id: userId, name: cat.name, icon: cat.icon })
-      .select()
-      .single();
+      .select('id')
+      .eq('user_id', userId)
+      .eq('name', cat.name)
+      .maybeSingle();
     
-    if (catError) throw catError;
+    let categoryId: string;
     
-    // Insert sub-categories
-    const subCats = cat.subCategories.map(sc => ({
-      category_id: newCat.id,
-      user_id: userId,
-      name: sc.name,
-    }));
+    if (existingCat) {
+      // Category already exists, use its ID
+      categoryId = existingCat.id;
+    } else {
+      // Insert new category
+      const { data: newCat, error: catError } = await supabase
+        .from('categories')
+        .insert({ user_id: userId, name: cat.name, icon: cat.icon })
+        .select()
+        .single();
+      
+      if (catError) {
+        // If duplicate key error, another concurrent request created it - fetch and continue
+        if (catError.code === '23505') {
+          const { data: fetchedCat } = await supabase
+            .from('categories')
+            .select('id')
+            .eq('user_id', userId)
+            .eq('name', cat.name)
+            .single();
+          if (fetchedCat) {
+            categoryId = fetchedCat.id;
+          } else {
+            throw catError;
+          }
+        } else {
+          throw catError;
+        }
+      } else {
+        categoryId = newCat.id;
+      }
+    }
     
-    const { error: subError } = await supabase
-      .from('sub_categories')
-      .insert(subCats);
-    
-    if (subError) throw subError;
+    // Insert sub-categories (skip if they already exist)
+    for (const sc of cat.subCategories) {
+      const { data: existingSub } = await supabase
+        .from('sub_categories')
+        .select('id')
+        .eq('category_id', categoryId)
+        .eq('name', sc.name)
+        .maybeSingle();
+      
+      if (!existingSub) {
+        const { error: subError } = await supabase
+          .from('sub_categories')
+          .insert({ category_id: categoryId, user_id: userId, name: sc.name });
+        
+        // Ignore duplicate key errors
+        if (subError && subError.code !== '23505') {
+          throw subError;
+        }
+      }
+    }
   }
 }
 
@@ -297,10 +409,23 @@ export async function getPaymentModes(): Promise<PaymentMode[]> {
   
   if (error) throw error;
   
-  // If no payment modes exist, initialize with defaults
+  // If no payment modes exist, initialize with defaults (with concurrency protection)
   if (!data || data.length === 0) {
-    await initializeDefaultPaymentModes(userId);
-    return getPaymentModes();
+    await ensureDefaultPaymentModesInitialized(userId);
+    
+    // Re-fetch after initialization
+    const { data: newModes, error: refetchError } = await supabase
+      .from('payment_modes')
+      .select('*')
+      .eq('user_id', userId);
+    
+    if (refetchError) throw refetchError;
+    
+    return (newModes || []).map(pm => ({
+      id: pm.id,
+      name: pm.name,
+      type: pm.type as PaymentMode['type'],
+    }));
   }
   
   return data.map(pm => ({
@@ -310,18 +435,68 @@ export async function getPaymentModes(): Promise<PaymentMode[]> {
   }));
 }
 
-async function initializeDefaultPaymentModes(userId: string): Promise<void> {
-  const modes = DEFAULT_PAYMENT_MODES.map(pm => ({
-    user_id: userId,
-    name: pm.name,
-    type: pm.type || 'other',
-  }));
+/**
+ * Ensures default payment modes are initialized exactly once per user.
+ * Uses in-memory locking to prevent concurrent initialization attempts.
+ */
+async function ensureDefaultPaymentModesInitialized(userId: string): Promise<void> {
+  const cacheKey = `payment_modes_${userId}`;
   
-  const { error } = await supabase
+  // If initialization is already in progress, wait for it
+  const existingInit = initializationInProgress.get(cacheKey);
+  if (existingInit) {
+    await existingInit;
+    return;
+  }
+  
+  // Start initialization with lock
+  const initPromise = initializeDefaultPaymentModesOnce(userId);
+  initializationInProgress.set(cacheKey, initPromise);
+  
+  try {
+    await initPromise;
+  } finally {
+    initializationInProgress.delete(cacheKey);
+  }
+}
+
+/**
+ * Actually performs the initialization, checking for existing data
+ * to prevent duplicates.
+ */
+async function initializeDefaultPaymentModesOnce(userId: string): Promise<void> {
+  // Double-check: another request may have created payment modes while we were waiting
+  const { data: existingModes } = await supabase
     .from('payment_modes')
-    .insert(modes);
+    .select('id')
+    .eq('user_id', userId)
+    .limit(1);
   
-  if (error) throw error;
+  if (existingModes && existingModes.length > 0) {
+    // Payment modes already exist, don't overwrite
+    return;
+  }
+  
+  // Insert payment modes one by one to handle race conditions
+  for (const pm of DEFAULT_PAYMENT_MODES) {
+    const { data: existingMode } = await supabase
+      .from('payment_modes')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('name', pm.name)
+      .maybeSingle();
+    
+    if (!existingMode) {
+      const { error } = await supabase
+        .from('payment_modes')
+        .insert({ user_id: userId, name: pm.name, type: pm.type || 'other' });
+      
+      // Ignore duplicate key errors (race condition handled)
+      if (error && error.code !== '23505') {
+        throw error;
+      }
+    }
+  }
 }
 
 export async function addPaymentMode(mode: Omit<PaymentMode, 'id'>): Promise<string> {
