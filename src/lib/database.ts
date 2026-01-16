@@ -18,6 +18,14 @@ export function generateId(): string {
 // Track initialization state per user to prevent concurrent calls
 const initializationInProgress = new Map<string, Promise<void>>();
 
+/**
+ * Clears all in-memory caches. Call this on logout to ensure
+ * complete isolation between users.
+ */
+export function clearInMemoryCaches(): void {
+  initializationInProgress.clear();
+}
+
 // ============= Categories =============
 
 export async function getCategories(): Promise<Category[]> {

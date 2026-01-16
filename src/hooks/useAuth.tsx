@@ -1,6 +1,8 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { queryClient } from '@/App';
+import { clearInMemoryCaches } from '@/lib/database';
 
 interface AuthContextType {
   user: User | null;
@@ -58,6 +60,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    // Clear all React Query caches to prevent data leakage between users
+    queryClient.clear();
+    
+    // Clear in-memory caches (initialization locks, etc.)
+    clearInMemoryCaches();
+    
+    // Sign out from Supabase (clears localStorage session)
     await supabase.auth.signOut();
   };
 
