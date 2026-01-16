@@ -11,7 +11,8 @@ import SettingsPage from "./pages/SettingsPage";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+// Export queryClient so it can be cleared on logout
+export const queryClient = new QueryClient();
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
