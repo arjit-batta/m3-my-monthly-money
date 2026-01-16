@@ -213,7 +213,12 @@ export default function SettingsPage() {
       <div className="space-y-4 pb-6">
         <div className="pt-6 flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-semibold">Settings</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-semibold">Settings</h1>
+              <span className="px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide rounded bg-muted text-muted-foreground">
+                Beta
+              </span>
+            </div>
             {user?.email && (
               <p className="text-sm text-muted-foreground">{user.email}</p>
             )}
@@ -290,6 +295,13 @@ export default function SettingsPage() {
             <PaymentModeManager />
           </TabsContent>
         </Tabs>
+
+        {/* Version info */}
+        <div className="pt-4 text-center">
+          <p className="text-xs text-muted-foreground">
+            Version 0.1.0
+          </p>
+        </div>
       </div>
 
       {/* Edit Sheet */}
