@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Pencil, Trash2, ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, ChevronDown, ChevronRight, Loader2, ArrowRight } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   getCategories, 
   addCategory, 
@@ -16,7 +17,8 @@ import {
   updateSubCategory,
   deleteSubCategory,
   getExpenses,
-  getBudgets
+  getBudgets,
+  reassignExpenses
 } from '@/lib/database';
 import { Category, Expense, Budget } from '@/types/expense';
 import { toast } from '@/hooks/use-toast';
@@ -47,6 +49,16 @@ export function CategoryManager() {
   
   // Delete dialogs
   const [deleteDialog, setDeleteDialog] = useState<{ type: 'category' | 'subcategory'; categoryId: string; subId?: string } | null>(null);
+  
+  // Reassignment state
+  const [reassignDialog, setReassignDialog] = useState<{
+    type: 'category' | 'subcategory';
+    fromCategoryId: string;
+    fromSubCategoryId?: string;
+    expenseCount: number;
+  } | null>(null);
+  const [reassignForm, setReassignForm] = useState({ categoryId: '', subCategoryId: '' });
+  const [reassigning, setReassigning] = useState(false);
 
   const loadData = useCallback(async () => {
     setError(null);
@@ -145,9 +157,16 @@ export function CategoryManager() {
     if (!deleteDialog || deleteDialog.type !== 'category') return;
     
     const deps = getCategoryDependencies(deleteDialog.categoryId);
-    if (deps.hasAny) {
-      toast({ title: 'Cannot delete', description: `This category has ${deps.expenseCount} expense(s) and ${deps.budgetCount} budget(s)`, variant: 'destructive' });
+    
+    // If expenses exist, open reassignment dialog instead of blocking
+    if (deps.expenseCount > 0) {
       setDeleteDialog(null);
+      setReassignForm({ categoryId: '', subCategoryId: '' });
+      setReassignDialog({
+        type: 'category',
+        fromCategoryId: deleteDialog.categoryId,
+        expenseCount: deps.expenseCount,
+      });
       return;
     }
 
@@ -212,15 +231,18 @@ export function CategoryManager() {
   const handleDeleteSubCategory = async () => {
     if (!deleteDialog || deleteDialog.type !== 'subcategory' || !deleteDialog.subId) return;
     
-    // Only block deletion if sub-category has expenses or active budgets
-    // Categories are allowed to temporarily have zero sub-categories
     const deps = getSubCategoryDependencies(deleteDialog.categoryId, deleteDialog.subId);
-    if (!deps.canDelete) {
-      const reasons = [];
-      if (deps.expenseCount > 0) reasons.push(`${deps.expenseCount} expense(s)`);
-      if (deps.hasActiveBudget) reasons.push('an active budget');
-      toast({ title: 'Cannot delete', description: `This sub-category has ${reasons.join(' and ')}`, variant: 'destructive' });
+    
+    // If expenses exist, open reassignment dialog instead of blocking
+    if (deps.expenseCount > 0) {
       setDeleteDialog(null);
+      setReassignForm({ categoryId: '', subCategoryId: '' });
+      setReassignDialog({
+        type: 'subcategory',
+        fromCategoryId: deleteDialog.categoryId,
+        fromSubCategoryId: deleteDialog.subId,
+        expenseCount: deps.expenseCount,
+      });
       return;
     }
 
@@ -238,6 +260,76 @@ export function CategoryManager() {
       });
     }
     setDeleteDialog(null);
+  };
+
+  // Handle reassignment and then deletion
+  const handleReassignAndDelete = async () => {
+    if (!reassignDialog || !reassignForm.categoryId || !reassignForm.subCategoryId) {
+      toast({ title: 'Please select a destination', variant: 'destructive' });
+      return;
+    }
+
+    setReassigning(true);
+    
+    try {
+      // Reassign expenses
+      await reassignExpenses(
+        reassignDialog.fromCategoryId,
+        reassignDialog.fromSubCategoryId || null,
+        reassignForm.categoryId,
+        reassignForm.subCategoryId
+      );
+      
+      // Now delete the category or sub-category
+      if (reassignDialog.type === 'category') {
+        await deleteCategory(reassignDialog.fromCategoryId);
+        toast({ title: 'Expenses reassigned and category deleted' });
+      } else if (reassignDialog.fromSubCategoryId) {
+        await deleteSubCategory(reassignDialog.fromSubCategoryId);
+        toast({ title: 'Expenses reassigned and sub-category deleted' });
+      }
+      
+      await loadData();
+      setReassignDialog(null);
+    } catch (err) {
+      console.error('Reassignment failed:', err);
+      toast({ 
+        title: 'Failed to reassign expenses',
+        description: err instanceof Error ? err.message : 'An error occurred',
+        variant: 'destructive' 
+      });
+    } finally {
+      setReassigning(false);
+    }
+  };
+
+  // Get available destination categories/sub-categories (excluding the one being deleted)
+  const getDestinationOptions = () => {
+    if (!reassignDialog) return [];
+    
+    return categories
+      .filter(c => {
+        // For category deletion, exclude the category being deleted
+        if (reassignDialog.type === 'category') {
+          return c.id !== reassignDialog.fromCategoryId;
+        }
+        return true;
+      })
+      .filter(c => c.subCategories.length > 0); // Only show categories with sub-categories
+  };
+
+  const getDestinationSubCategories = () => {
+    if (!reassignForm.categoryId || !reassignDialog) return [];
+    
+    const category = categories.find(c => c.id === reassignForm.categoryId);
+    if (!category) return [];
+    
+    // For sub-category deletion within the same category, exclude the one being deleted
+    if (reassignDialog.type === 'subcategory' && reassignForm.categoryId === reassignDialog.fromCategoryId) {
+      return category.subCategories.filter(sc => sc.id !== reassignDialog.fromSubCategoryId);
+    }
+    
+    return category.subCategories;
   };
 
   if (loading) {
@@ -425,47 +517,10 @@ export function CategoryManager() {
             <AlertDialogTitle>
               Delete {deleteDialog?.type === 'category' ? 'Category' : 'Sub-category'}?
             </AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-2">
-                {deleteDialog?.type === 'category' ? (
-                  <>
-                    <p>This will delete the category and all its sub-categories.</p>
-                    {deleteDialog && (() => {
-                      const deps = getCategoryDependencies(deleteDialog.categoryId);
-                      if (deps.hasAny) {
-                        return (
-                          <p className="text-destructive font-medium">
-                            ⚠️ Cannot delete: {deps.expenseCount} expense(s) and {deps.budgetCount} budget(s) exist for this category.
-                          </p>
-                        );
-                      }
-                      return null;
-                    })()}
-                  </>
-                ) : (
-                  <>
-                    <p>This will delete the sub-category.</p>
-                    {deleteDialog?.subId && (() => {
-                      const category = categories.find(c => c.id === deleteDialog.categoryId);
-                      if (category && category.subCategories.length <= 1) {
-                        return <p className="text-destructive font-medium">⚠️ Cannot delete: Category must have at least one sub-category.</p>;
-                      }
-                      const deps = getSubCategoryDependencies(deleteDialog.categoryId, deleteDialog.subId);
-                      if (!deps.canDelete) {
-                        const reasons = [];
-                        if (deps.expenseCount > 0) reasons.push(`${deps.expenseCount} expense(s)`);
-                        if (deps.hasActiveBudget) reasons.push('an active budget');
-                        return (
-                          <p className="text-destructive font-medium">
-                            ⚠️ Cannot delete: {reasons.join(' and ')} exist.
-                          </p>
-                        );
-                      }
-                      return null;
-                    })()}
-                  </>
-                )}
-              </div>
+            <AlertDialogDescription>
+              {deleteDialog?.type === 'category' 
+                ? 'This will delete the category and all its sub-categories.'
+                : 'This will delete the sub-category.'}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -479,6 +534,86 @@ export function CategoryManager() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Reassignment Sheet */}
+      <Sheet open={!!reassignDialog} onOpenChange={(open) => !open && setReassignDialog(null)}>
+        <SheetContent side="bottom" className="h-auto">
+          <SheetHeader>
+            <SheetTitle>Reassign Expenses</SheetTitle>
+          </SheetHeader>
+          <div className="mt-6 space-y-4 pb-6">
+            <div className="rounded-lg bg-muted p-3">
+              <p className="text-sm">
+                <span className="font-medium">{reassignDialog?.expenseCount} expense(s)</span> are linked to this {reassignDialog?.type === 'category' ? 'category' : 'sub-category'}. 
+                Please select where to move them before deletion.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Move to Category</Label>
+              <Select 
+                value={reassignForm.categoryId} 
+                onValueChange={(value) => setReassignForm({ categoryId: value, subCategoryId: '' })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {getDestinationOptions().map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      {cat.icon} {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {reassignForm.categoryId && (
+              <div className="space-y-2">
+                <Label>Move to Sub-category</Label>
+                <Select 
+                  value={reassignForm.subCategoryId} 
+                  onValueChange={(value) => setReassignForm({ ...reassignForm, subCategoryId: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select sub-category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {getDestinationSubCategories().map((sub) => (
+                      <SelectItem key={sub.id} value={sub.id}>
+                        {sub.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="flex gap-2 pt-2">
+              <Button 
+                variant="outline" 
+                className="flex-1" 
+                onClick={() => setReassignDialog(null)}
+                disabled={reassigning}
+              >
+                Cancel
+              </Button>
+              <Button 
+                className="flex-1" 
+                onClick={handleReassignAndDelete}
+                disabled={!reassignForm.categoryId || !reassignForm.subCategoryId || reassigning}
+              >
+                {reassigning ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <ArrowRight className="mr-2 h-4 w-4" />
+                )}
+                Reassign & Delete
+              </Button>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

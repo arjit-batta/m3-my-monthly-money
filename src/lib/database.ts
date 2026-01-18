@@ -391,6 +391,39 @@ export async function deleteExpense(expenseId: string): Promise<boolean> {
   return !error;
 }
 
+/**
+ * Reassign expenses from one category/sub-category to another.
+ * Used before deleting a category or sub-category that has expenses.
+ */
+export async function reassignExpenses(
+  fromCategoryId: string,
+  fromSubCategoryId: string | null,
+  toCategoryId: string,
+  toSubCategoryId: string
+): Promise<number> {
+  const userId = await getUserId();
+  
+  // Build the query to find matching expenses
+  let query = supabase
+    .from('expenses')
+    .update({ 
+      category_id: toCategoryId, 
+      sub_category_id: toSubCategoryId 
+    })
+    .eq('user_id', userId)
+    .eq('category_id', fromCategoryId);
+  
+  // If sub-category is specified, filter by it; otherwise reassign all expenses in the category
+  if (fromSubCategoryId) {
+    query = query.eq('sub_category_id', fromSubCategoryId);
+  }
+  
+  const { error, count } = await query.select();
+  
+  if (error) throw error;
+  return count || 0;
+}
+
 // ============= Budgets =============
 
 export async function getBudgets(): Promise<Budget[]> {
