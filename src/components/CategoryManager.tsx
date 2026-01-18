@@ -212,13 +212,8 @@ export function CategoryManager() {
   const handleDeleteSubCategory = async () => {
     if (!deleteDialog || deleteDialog.type !== 'subcategory' || !deleteDialog.subId) return;
     
-    const category = categories.find(c => c.id === deleteDialog.categoryId);
-    if (category && category.subCategories.length <= 1) {
-      toast({ title: 'Cannot delete', description: 'Category must have at least one sub-category', variant: 'destructive' });
-      setDeleteDialog(null);
-      return;
-    }
-
+    // Only block deletion if sub-category has expenses or active budgets
+    // Categories are allowed to temporarily have zero sub-categories
     const deps = getSubCategoryDependencies(deleteDialog.categoryId, deleteDialog.subId);
     if (!deps.canDelete) {
       const reasons = [];
