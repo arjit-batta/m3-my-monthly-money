@@ -1,8 +1,9 @@
-import { useState, useCallback } from 'react';
-import { format } from 'date-fns';
+import { useState, useCallback, useMemo } from 'react';
+import { format, getDaysInMonth } from 'date-fns';
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { AppLayout } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
 import { BudgetCard } from '@/components/BudgetCard';
 import { BudgetEditor } from '@/components/BudgetEditor';
 import { useBudgetData } from '@/hooks/useBudgetData';
@@ -68,6 +69,25 @@ export default function Budgets() {
   };
 
   const monthLabel = format(new Date(year, month - 1), 'MMMM yyyy');
+
+  // Calculate month progress
+  const monthProgress = useMemo(() => {
+    const today = new Date();
+    const isCurrentMonth = today.getMonth() + 1 === month && today.getFullYear() === year;
+    
+    if (!isCurrentMonth) {
+      // If viewing a past month, it's 100% complete; future month is 0%
+      const selectedDate = new Date(year, month - 1);
+      if (selectedDate < new Date(today.getFullYear(), today.getMonth())) {
+        return 100;
+      }
+      return 0;
+    }
+    
+    const currentDay = today.getDate();
+    const totalDays = getDaysInMonth(new Date(year, month - 1));
+    return Math.round((currentDay / totalDays) * 100);
+  }, [month, year]);
   const isOverBudget = remaining < 0;
 
   return (
@@ -98,6 +118,19 @@ export default function Budgets() {
         {/* Content when loaded successfully */}
         {!loading && !error && (
           <>
+            {/* Month Progress Indicator */}
+            <div className="rounded-xl border border-border bg-card p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-foreground">
+                  {monthLabel} • {monthProgress}% of month completed
+                </span>
+              </div>
+              <Progress 
+                value={monthProgress} 
+                className="h-2 bg-muted [&>div]:bg-muted-foreground/50"
+              />
+            </div>
+
             {/* Summary card */}
             <div className="rounded-xl bg-primary/10 p-4">
               <div className="grid grid-cols-3 gap-4 text-center">
