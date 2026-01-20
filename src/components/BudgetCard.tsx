@@ -59,6 +59,11 @@ export function BudgetCard({ category, onEditBudget }: BudgetCardProps) {
                 </p>
               )}
             </div>
+            {category.totalBudget > 0 && (
+              <span className={cn('text-sm font-medium min-w-[52px] text-right', getStatusColor(category.percentage, true))}>
+                {Math.round(category.percentage)}% used
+              </span>
+            )}
             {isOpen ? (
               <ChevronUp className="h-5 w-5 text-muted-foreground" />
             ) : (
@@ -89,12 +94,17 @@ export function BudgetCard({ category, onEditBudget }: BudgetCardProps) {
                       )}
                     </div>
                     {sub.budget > 0 && (
-                      <div className="w-12">
-                        <Progress
-                          value={Math.min(sub.percentage, 100)}
-                          className={cn('h-1.5', getProgressColor(sub.percentage))}
-                        />
-                      </div>
+                      <>
+                        <span className={cn('text-xs font-medium min-w-[44px] text-right', getStatusColor(sub.percentage, true))}>
+                          {Math.round(sub.percentage)}%
+                        </span>
+                        <div className="w-12">
+                          <Progress
+                            value={Math.min(sub.percentage, 100)}
+                            className={cn('h-1.5', getProgressColor(sub.percentage))}
+                          />
+                        </div>
+                      </>
                     )}
                     <Button
                       variant="ghost"
