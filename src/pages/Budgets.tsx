@@ -68,7 +68,7 @@ export default function Budgets() {
     setRefreshKey((k) => k + 1);
   };
 
-  const monthLabel = format(new Date(year, month - 1), 'MMMM yyyy');
+  const monthLabel = format(new Date(year, month - 1), 'MMM yyyy');
 
   // Calculate month progress
   const monthProgress = useMemo(() => {
@@ -122,7 +122,7 @@ export default function Budgets() {
             <div className="rounded-xl border border-border bg-card p-4">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-medium text-foreground">
-                  {monthLabel} • {monthProgress}% of month completed
+                  {monthLabel} • {monthProgress}% complete
                 </span>
               </div>
               <Progress 
