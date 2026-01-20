@@ -40,76 +40,71 @@ export function BudgetCard({ category, onEditBudget }: BudgetCardProps) {
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
       <div className="rounded-xl border bg-card p-4 shadow-sm">
-        <CollapsibleTrigger className="flex w-full items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="text-2xl">{category.icon}</span>
-            <div className="text-left">
-              <p className="font-medium">{category.categoryName}</p>
-              <p className="text-sm text-muted-foreground">
-                {category.subCategories.length} sub-categories
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="text-right">
-              <p className="font-semibold">{formatCurrency(category.totalSpent)}</p>
-              {category.totalBudget > 0 && (
-                <p className={cn('text-sm', getStatusColor(category.percentage, true) || 'text-muted-foreground')}>
-                  of {formatCurrency(category.totalBudget)}
+        <CollapsibleTrigger className="w-full text-left">
+          {/* Category header row */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">{category.icon}</span>
+              <div>
+                <p className="font-medium">{category.categoryName}</p>
+                <p className="text-sm text-muted-foreground">
+                  {category.subCategories.length} sub-categories
                 </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="text-right">
+                <p className="font-semibold">{formatCurrency(category.totalSpent)}</p>
+                {category.totalBudget > 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    of {formatCurrency(category.totalBudget)}
+                  </p>
+                )}
+              </div>
+              {isOpen ? (
+                <ChevronUp className="h-5 w-5 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="h-5 w-5 text-muted-foreground" />
               )}
             </div>
-            {category.totalBudget > 0 && (
-              <span className={cn('text-sm font-medium min-w-[52px] text-right', getStatusColor(category.percentage, true))}>
-                {Math.round(category.percentage)}% used
-              </span>
-            )}
-            {isOpen ? (
-              <ChevronUp className="h-5 w-5 text-muted-foreground" />
-            ) : (
-              <ChevronDown className="h-5 w-5 text-muted-foreground" />
-            )}
           </div>
+
+          {/* Category percentage + progress bar */}
+          {category.totalBudget > 0 && (
+            <div className="mt-3">
+              <p className={cn('text-sm font-medium mb-1', getStatusColor(category.percentage, true))}>
+                {Math.round(category.percentage)}% used
+              </p>
+              <Progress
+                value={Math.min(category.percentage, 100)}
+                className={cn('h-2', getProgressColor(category.percentage))}
+              />
+            </div>
+          )}
         </CollapsibleTrigger>
 
-        {category.totalBudget > 0 && (
-          <Progress
-            value={Math.min(category.percentage, 100)}
-            className={cn('mt-3 h-2', getProgressColor(category.percentage))}
-          />
-        )}
-
         <CollapsibleContent>
-          <div className="mt-4 space-y-3 border-t pt-4">
+          <div className="mt-4 space-y-4 border-t pt-4">
             {category.subCategories.map((sub) => (
-                <div key={sub.subCategoryId} className="flex items-center justify-between">
-                  <span className="text-sm">{sub.subCategoryName}</span>
+              <div key={sub.subCategoryId} className="space-y-1">
+                {/* Sub-category header row */}
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <span className="text-sm font-medium">{sub.subCategoryName}</span>
+                  </div>
                   <div className="flex items-center gap-2">
                     <div className="text-right">
                       <span className="text-sm font-medium">{formatCurrency(sub.spent)}</span>
                       {sub.budget > 0 && (
-                        <span className={cn('text-sm', getStatusColor(sub.percentage, true) || 'text-muted-foreground')}>
+                        <span className="text-sm text-muted-foreground">
                           {' '}/ {formatCurrency(sub.budget)}
                         </span>
                       )}
                     </div>
-                    {sub.budget > 0 && (
-                      <>
-                        <span className={cn('text-xs font-medium min-w-[44px] text-right', getStatusColor(sub.percentage, true))}>
-                          {Math.round(sub.percentage)}%
-                        </span>
-                        <div className="w-12">
-                          <Progress
-                            value={Math.min(sub.percentage, 100)}
-                            className={cn('h-1.5', getProgressColor(sub.percentage))}
-                          />
-                        </div>
-                      </>
-                    )}
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-7 w-7"
+                      className="h-7 w-7 shrink-0"
                       onClick={(e) => {
                         e.stopPropagation();
                         onEditBudget?.(category.categoryId, sub.subCategoryId, sub.budget);
@@ -119,8 +114,21 @@ export function BudgetCard({ category, onEditBudget }: BudgetCardProps) {
                     </Button>
                   </div>
                 </div>
-              )
-            )}
+
+                {/* Sub-category percentage + progress bar */}
+                {sub.budget > 0 && (
+                  <div className="pl-0">
+                    <p className={cn('text-xs font-medium mb-1', getStatusColor(sub.percentage, true))}>
+                      {Math.round(sub.percentage)}% used
+                    </p>
+                    <Progress
+                      value={Math.min(sub.percentage, 100)}
+                      className={cn('h-1.5', getProgressColor(sub.percentage))}
+                    />
+                  </div>
+                )}
+              </div>
+            ))}
             {!hasSubsWithBudget && (
               <p className="text-sm text-muted-foreground italic">No budgets set. Tap the pencil icon to add one.</p>
             )}
