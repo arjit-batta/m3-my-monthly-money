@@ -9,6 +9,7 @@ export interface PaymentMode {
 export interface SubCategory {
   id: string;
   name: string;
+  orderIndex?: number;
 }
 
 export interface Category {
@@ -16,6 +17,7 @@ export interface Category {
   name: string;
   icon: string;
   color: string;
+  orderIndex?: number;
   subCategories: SubCategory[]; // Must have at least 1
 }
 

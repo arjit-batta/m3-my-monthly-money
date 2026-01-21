@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Pencil, Trash2, ChevronDown, ChevronRight, Loader2, ArrowRight } from 'lucide-react';
+import { Plus, Pencil, Trash2, ChevronDown, ChevronRight, Loader2, ArrowRight, ChevronUp } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,7 +18,9 @@ import {
   deleteSubCategory,
   getExpenses,
   getBudgets,
-  reassignExpenses
+  reassignExpenses,
+  swapCategoryOrder,
+  swapSubCategoryOrder
 } from '@/lib/database';
 import { Category, Expense, Budget } from '@/types/expense';
 import { toast } from '@/hooks/use-toast';
@@ -59,6 +61,7 @@ export function CategoryManager() {
   } | null>(null);
   const [reassignForm, setReassignForm] = useState({ categoryId: '', subCategoryId: '' });
   const [reassigning, setReassigning] = useState(false);
+  const [reordering, setReordering] = useState(false);
 
   const loadData = useCallback(async () => {
     setError(null);
@@ -332,6 +335,59 @@ export function CategoryManager() {
     return category.subCategories;
   };
 
+  // Reorder handlers
+  const handleMoveCategoryUp = async (index: number) => {
+    if (index === 0 || reordering) return;
+    setReordering(true);
+    try {
+      await swapCategoryOrder(categories[index].id, categories[index - 1].id);
+      await loadData();
+    } catch (err) {
+      console.error('Failed to reorder category:', err);
+    } finally {
+      setReordering(false);
+    }
+  };
+
+  const handleMoveCategoryDown = async (index: number) => {
+    if (index >= categories.length - 1 || reordering) return;
+    setReordering(true);
+    try {
+      await swapCategoryOrder(categories[index].id, categories[index + 1].id);
+      await loadData();
+    } catch (err) {
+      console.error('Failed to reorder category:', err);
+    } finally {
+      setReordering(false);
+    }
+  };
+
+  const handleMoveSubCategoryUp = async (category: Category, subIndex: number) => {
+    if (subIndex === 0 || reordering) return;
+    setReordering(true);
+    try {
+      await swapSubCategoryOrder(category.subCategories[subIndex].id, category.subCategories[subIndex - 1].id);
+      await loadData();
+    } catch (err) {
+      console.error('Failed to reorder sub-category:', err);
+    } finally {
+      setReordering(false);
+    }
+  };
+
+  const handleMoveSubCategoryDown = async (category: Category, subIndex: number) => {
+    if (subIndex >= category.subCategories.length - 1 || reordering) return;
+    setReordering(true);
+    try {
+      await swapSubCategoryOrder(category.subCategories[subIndex].id, category.subCategories[subIndex + 1].id);
+      await loadData();
+    } catch (err) {
+      console.error('Failed to reorder sub-category:', err);
+    } finally {
+      setReordering(false);
+    }
+  };
+
   if (loading) {
     return <LoadingState />;
   }
@@ -353,50 +409,95 @@ export function CategoryManager() {
       </div>
 
       <div className="space-y-2">
-        {categories.map((category) => (
+        {categories.map((category, categoryIndex) => (
           <Card key={category.id}>
             <Collapsible open={expandedCategories.has(category.id)} onOpenChange={() => toggleCategory(category.id)}>
               <CardContent className="p-0">
-                <CollapsibleTrigger asChild>
-                  <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50">
-                    <div className="flex items-center gap-3">
-                      {expandedCategories.has(category.id) ? (
-                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                      )}
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full text-lg" style={{ backgroundColor: category.color + '20' }}>
-                        {category.icon}
-                      </div>
-                      <div>
-                        <p className="font-medium">{category.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {category.subCategories.length} sub-categor{category.subCategories.length === 1 ? 'y' : 'ies'}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditCategory(category)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-8 w-8 text-destructive" 
-                        onClick={() => setDeleteDialog({ type: 'category', categoryId: category.id })}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                <div className="flex items-center p-4">
+                  {/* Reorder buttons */}
+                  <div className="flex flex-col gap-0.5 mr-2" onClick={(e) => e.stopPropagation()}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      disabled={categoryIndex === 0 || reordering}
+                      onClick={() => handleMoveCategoryUp(categoryIndex)}
+                    >
+                      <ChevronUp className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      disabled={categoryIndex >= categories.length - 1 || reordering}
+                      onClick={() => handleMoveCategoryDown(categoryIndex)}
+                    >
+                      <ChevronDown className="h-4 w-4" />
+                    </Button>
                   </div>
-                </CollapsibleTrigger>
+                  
+                  <CollapsibleTrigger asChild>
+                    <div className="flex flex-1 items-center justify-between cursor-pointer hover:bg-muted/50 rounded-lg -m-2 p-2">
+                      <div className="flex items-center gap-3">
+                        {expandedCategories.has(category.id) ? (
+                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        )}
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full text-lg" style={{ backgroundColor: category.color + '20' }}>
+                          {category.icon}
+                        </div>
+                        <div>
+                          <p className="font-medium">{category.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {category.subCategories.length} sub-categor{category.subCategories.length === 1 ? 'y' : 'ies'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditCategory(category)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 text-destructive" 
+                          onClick={() => setDeleteDialog({ type: 'category', categoryId: category.id })}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CollapsibleTrigger>
+                </div>
                 
                 <CollapsibleContent>
                   <div className="border-t px-4 pb-4">
                     <div className="mt-3 space-y-2">
-                      {category.subCategories.map((sub) => (
-                        <div key={sub.id} className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2">
-                          <span className="text-sm">{sub.name}</span>
+                      {category.subCategories.map((sub, subIndex) => (
+                        <div key={sub.id} className="flex items-center rounded-lg bg-muted/50 px-3 py-2">
+                          {/* Sub-category reorder buttons */}
+                          <div className="flex flex-col gap-0.5 mr-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-5 w-5"
+                              disabled={subIndex === 0 || reordering}
+                              onClick={() => handleMoveSubCategoryUp(category, subIndex)}
+                            >
+                              <ChevronUp className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-5 w-5"
+                              disabled={subIndex >= category.subCategories.length - 1 || reordering}
+                              onClick={() => handleMoveSubCategoryDown(category, subIndex)}
+                            >
+                              <ChevronDown className="h-3 w-3" />
+                            </Button>
+                          </div>
+                          <span className="text-sm flex-1">{sub.name}</span>
                           <div className="flex gap-1">
                             <Button 
                               variant="ghost" 

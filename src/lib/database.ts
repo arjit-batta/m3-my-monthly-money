@@ -35,7 +35,8 @@ export async function getCategories(): Promise<Category[]> {
   const { data: categories, error } = await supabase
     .from('categories')
     .select('*')
-    .eq('user_id', userId);
+    .eq('user_id', userId)
+    .order('order_index', { ascending: true });
   
   if (error) throw error;
   
@@ -47,23 +48,26 @@ export async function getCategories(): Promise<Category[]> {
     const { data: newCategories, error: refetchError } = await supabase
       .from('categories')
       .select('*')
-      .eq('user_id', userId);
+      .eq('user_id', userId)
+      .order('order_index', { ascending: true });
     
     if (refetchError) throw refetchError;
     
     const { data: subCategories } = await supabase
       .from('sub_categories')
       .select('*')
-      .eq('user_id', userId);
+      .eq('user_id', userId)
+      .order('order_index', { ascending: true });
     
     return (newCategories || []).map(cat => ({
       id: cat.id,
       name: cat.name,
       icon: cat.icon,
       color: '',
+      orderIndex: cat.order_index,
       subCategories: (subCategories || [])
         .filter(sc => sc.category_id === cat.id)
-        .map(sc => ({ id: sc.id, name: sc.name })),
+        .map(sc => ({ id: sc.id, name: sc.name, orderIndex: sc.order_index })),
     }));
   }
   
@@ -71,7 +75,8 @@ export async function getCategories(): Promise<Category[]> {
   const { data: subCategories, error: subError } = await supabase
     .from('sub_categories')
     .select('*')
-    .eq('user_id', userId);
+    .eq('user_id', userId)
+    .order('order_index', { ascending: true });
   
   if (subError) throw subError;
   
@@ -81,9 +86,10 @@ export async function getCategories(): Promise<Category[]> {
     name: cat.name,
     icon: cat.icon,
     color: '',
+    orderIndex: cat.order_index,
     subCategories: (subCategories || [])
       .filter(sc => sc.category_id === cat.id)
-      .map(sc => ({ id: sc.id, name: sc.name })),
+      .map(sc => ({ id: sc.id, name: sc.name, orderIndex: sc.order_index })),
   }));
 }
 
@@ -131,6 +137,7 @@ async function initializeDefaultCategoriesOnce(userId: string): Promise<void> {
   }
   
   // Insert categories one by one with conflict handling
+  let categoryOrderIndex = 0;
   for (const cat of DEFAULT_CATEGORIES) {
     // Use a deterministic approach - check if category with same name exists
     const { data: existingCat } = await supabase
@@ -146,10 +153,10 @@ async function initializeDefaultCategoriesOnce(userId: string): Promise<void> {
       // Category already exists, use its ID
       categoryId = existingCat.id;
     } else {
-      // Insert new category
+      // Insert new category with order_index
       const { data: newCat, error: catError } = await supabase
         .from('categories')
-        .insert({ user_id: userId, name: cat.name, icon: cat.icon })
+        .insert({ user_id: userId, name: cat.name, icon: cat.icon, order_index: categoryOrderIndex })
         .select()
         .single();
       
@@ -175,7 +182,10 @@ async function initializeDefaultCategoriesOnce(userId: string): Promise<void> {
       }
     }
     
+    categoryOrderIndex++;
+    
     // Insert sub-categories (skip if they already exist)
+    let subOrderIndex = 0;
     for (const sc of cat.subCategories) {
       const { data: existingSub } = await supabase
         .from('sub_categories')
@@ -187,13 +197,14 @@ async function initializeDefaultCategoriesOnce(userId: string): Promise<void> {
       if (!existingSub) {
         const { error: subError } = await supabase
           .from('sub_categories')
-          .insert({ category_id: categoryId, user_id: userId, name: sc.name });
+          .insert({ category_id: categoryId, user_id: userId, name: sc.name, order_index: subOrderIndex });
         
         // Ignore duplicate key errors
         if (subError && subError.code !== '23505') {
           throw subError;
         }
       }
+      subOrderIndex++;
     }
   }
 }
@@ -201,20 +212,32 @@ async function initializeDefaultCategoriesOnce(userId: string): Promise<void> {
 export async function addCategory(category: { name: string; icon: string; subCategories: SubCategory[] }): Promise<string> {
   const userId = await getUserId();
   
+  // Get max order_index for categories
+  const { data: maxOrderData } = await supabase
+    .from('categories')
+    .select('order_index')
+    .eq('user_id', userId)
+    .order('order_index', { ascending: false })
+    .limit(1)
+    .single();
+  
+  const newOrderIndex = (maxOrderData?.order_index ?? -1) + 1;
+  
   const { data: newCat, error: catError } = await supabase
     .from('categories')
-    .insert({ user_id: userId, name: category.name, icon: category.icon })
+    .insert({ user_id: userId, name: category.name, icon: category.icon, order_index: newOrderIndex })
     .select()
     .single();
   
   if (catError) throw catError;
   
-  // Insert sub-categories
+  // Insert sub-categories with order_index
   if (category.subCategories.length > 0) {
-    const subCats = category.subCategories.map(sc => ({
+    const subCats = category.subCategories.map((sc, index) => ({
       category_id: newCat.id,
       user_id: userId,
       name: sc.name,
+      order_index: index,
     }));
     
     const { error: subError } = await supabase
@@ -277,14 +300,108 @@ export async function deleteCategory(categoryId: string): Promise<boolean> {
 export async function addSubCategory(categoryId: string, name: string): Promise<string> {
   const userId = await getUserId();
   
+  // Get max order_index for sub-categories in this category
+  const { data: maxOrderData } = await supabase
+    .from('sub_categories')
+    .select('order_index')
+    .eq('category_id', categoryId)
+    .order('order_index', { ascending: false })
+    .limit(1)
+    .single();
+  
+  const newOrderIndex = (maxOrderData?.order_index ?? -1) + 1;
+  
   const { data, error } = await supabase
     .from('sub_categories')
-    .insert({ category_id: categoryId, user_id: userId, name })
+    .insert({ category_id: categoryId, user_id: userId, name, order_index: newOrderIndex })
     .select()
     .single();
   
   if (error) throw error;
   return data.id;
+}
+
+// ============= Reordering =============
+
+/**
+ * Swap order_index between two categories
+ */
+export async function swapCategoryOrder(categoryId1: string, categoryId2: string): Promise<boolean> {
+  const userId = await getUserId();
+  
+  // Get current order indices
+  const { data: cat1 } = await supabase
+    .from('categories')
+    .select('order_index')
+    .eq('id', categoryId1)
+    .eq('user_id', userId)
+    .single();
+  
+  const { data: cat2 } = await supabase
+    .from('categories')
+    .select('order_index')
+    .eq('id', categoryId2)
+    .eq('user_id', userId)
+    .single();
+  
+  if (!cat1 || !cat2) return false;
+  
+  // Swap order indices
+  const { error: err1 } = await supabase
+    .from('categories')
+    .update({ order_index: cat2.order_index })
+    .eq('id', categoryId1);
+  
+  if (err1) throw err1;
+  
+  const { error: err2 } = await supabase
+    .from('categories')
+    .update({ order_index: cat1.order_index })
+    .eq('id', categoryId2);
+  
+  if (err2) throw err2;
+  
+  return true;
+}
+
+/**
+ * Swap order_index between two sub-categories within the same category
+ */
+export async function swapSubCategoryOrder(subCategoryId1: string, subCategoryId2: string): Promise<boolean> {
+  // Get current order indices
+  const { data: sub1 } = await supabase
+    .from('sub_categories')
+    .select('order_index, category_id')
+    .eq('id', subCategoryId1)
+    .single();
+  
+  const { data: sub2 } = await supabase
+    .from('sub_categories')
+    .select('order_index, category_id')
+    .eq('id', subCategoryId2)
+    .single();
+  
+  if (!sub1 || !sub2) return false;
+  
+  // Ensure they're in the same category
+  if (sub1.category_id !== sub2.category_id) return false;
+  
+  // Swap order indices
+  const { error: err1 } = await supabase
+    .from('sub_categories')
+    .update({ order_index: sub2.order_index })
+    .eq('id', subCategoryId1);
+  
+  if (err1) throw err1;
+  
+  const { error: err2 } = await supabase
+    .from('sub_categories')
+    .update({ order_index: sub1.order_index })
+    .eq('id', subCategoryId2);
+  
+  if (err2) throw err2;
+  
+  return true;
 }
 
 export async function updateSubCategory(subCategoryId: string, name: string): Promise<boolean> {
