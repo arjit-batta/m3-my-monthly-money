@@ -493,7 +493,7 @@ export async function updateExpense(expenseId: string, updates: Partial<Expense>
   
   const { error } = await supabase
     .from('expenses')
-    .update(updateData)
+    .update(updateData as never)
     .eq('id', expenseId);
   
   return !error;
@@ -594,6 +594,68 @@ export async function deleteBudget(budgetId: string): Promise<boolean> {
     .eq('id', budgetId);
   
   return !error;
+}
+
+/**
+ * Ensure budgets exist for the given month/year by copying from the most recent
+ * prior month that has budgets. Idempotent: does nothing if budgets already exist.
+ * Returns true if budgets were copied, false otherwise.
+ */
+export async function ensureBudgetsForMonth(month: number, year: number): Promise<boolean> {
+  const userId = await getUserId();
+
+  // Check if budgets already exist for this month
+  const { data: existing, error: existingErr } = await supabase
+    .from('budgets')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('month', month)
+    .eq('year', year)
+    .limit(1);
+
+  if (existingErr) throw existingErr;
+  if (existing && existing.length > 0) return false;
+
+  // Find the most recent prior month with budgets
+  const { data: priorMonths, error: priorErr } = await supabase
+    .from('budgets')
+    .select('month, year')
+    .eq('user_id', userId)
+    .or(`year.lt.${year},and(year.eq.${year},month.lt.${month})`)
+    .order('year', { ascending: false })
+    .order('month', { ascending: false })
+    .limit(1);
+
+  if (priorErr) throw priorErr;
+  if (!priorMonths || priorMonths.length === 0) return false;
+
+  const { month: srcMonth, year: srcYear } = priorMonths[0];
+
+  const { data: srcBudgets, error: srcErr } = await supabase
+    .from('budgets')
+    .select('category_id, sub_category_id, amount')
+    .eq('user_id', userId)
+    .eq('month', srcMonth)
+    .eq('year', srcYear);
+
+  if (srcErr) throw srcErr;
+  if (!srcBudgets || srcBudgets.length === 0) return false;
+
+  const rows = srcBudgets.map(b => ({
+    user_id: userId,
+    category_id: b.category_id,
+    sub_category_id: b.sub_category_id,
+    month,
+    year,
+    amount: b.amount,
+  }));
+
+  const { error: insertErr } = await supabase
+    .from('budgets')
+    .upsert(rows, { onConflict: 'user_id,category_id,sub_category_id,month,year' });
+
+  if (insertErr) throw insertErr;
+  return true;
 }
 
 // ============= Payment Modes =============
@@ -722,7 +784,7 @@ export async function updatePaymentMode(modeId: string, updates: Partial<Payment
   
   const { error } = await supabase
     .from('payment_modes')
-    .update(updateData)
+    .update(updateData as never)
     .eq('id', modeId);
   
   return !error;
