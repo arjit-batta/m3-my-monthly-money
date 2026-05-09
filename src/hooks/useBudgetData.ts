@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getCategories, getExpenses, getBudgets } from '@/lib/database';
+import { getCategories, getExpenses, getBudgets, ensureBudgetsForMonth } from '@/lib/database';
 import { CategorySpending, SubCategorySpending } from '@/types/expense';
 
 export function useBudgetData(month: number, year: number, refreshKey: number = 0) {
@@ -20,6 +20,14 @@ export function useBudgetData(month: number, year: number, refreshKey: number = 
   const fetchData = useCallback(async () => {
     setError(null);
     try {
+      // Auto-copy previous month's budgets into this month if none exist yet.
+      try {
+        await ensureBudgetsForMonth(month, year);
+      } catch (initErr) {
+        // Non-fatal: log and continue rendering with whatever exists.
+        console.warn('Budget initialization skipped:', initErr);
+      }
+
       const [categories, expenses, budgets] = await Promise.all([
         getCategories(),
         getExpenses(),
