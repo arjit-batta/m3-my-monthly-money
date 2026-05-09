@@ -493,7 +493,7 @@ export async function updateExpense(expenseId: string, updates: Partial<Expense>
   
   const { error } = await supabase
     .from('expenses')
-    .update(updateData)
+    .update(updateData as never)
     .eq('id', expenseId);
   
   return !error;
@@ -784,7 +784,7 @@ export async function updatePaymentMode(modeId: string, updates: Partial<Payment
   
   const { error } = await supabase
     .from('payment_modes')
-    .update(updateData)
+    .update(updateData as never)
     .eq('id', modeId);
   
   return !error;
