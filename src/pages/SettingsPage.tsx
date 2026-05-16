@@ -12,8 +12,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { getExpenses, getCategories, getPaymentModes, deleteExpense, updateExpense } from '@/lib/database';
-import { Expense, Category, PaymentMode } from '@/types/expense';
+import { getExpenses, getCategories, getPaymentModes, getBudgets, deleteExpense, updateExpense } from '@/lib/database';
+import { Expense, Category, PaymentMode, Budget } from '@/types/expense';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { CategoryManager } from '@/components/CategoryManager';
@@ -43,18 +43,22 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [exportMonth, setExportMonth] = useState<string>('');
   const [exporting, setExporting] = useState(false);
+  const [exportingBudget, setExportingBudget] = useState(false);
+  const [budgets, setBudgets] = useState<Budget[]>([]);
 
   const loadData = useCallback(async () => {
     setError(null);
     try {
-      const [exps, cats, modes] = await Promise.all([
+      const [exps, cats, modes, buds] = await Promise.all([
         getExpenses(),
         getCategories(),
         getPaymentModes(),
+        getBudgets(),
       ]);
       setExpenses(exps);
       setCategories(cats);
       setPaymentModes(modes);
+      setBudgets(buds);
     } catch (err) {
       console.error('Failed to load data:', err);
       setError(err instanceof Error ? err.message : 'Failed to load data');
@@ -151,12 +155,27 @@ export default function SettingsPage() {
     ];
     const csvContent = '\ufeff' + csvLines.join('\n');
     const fileName = `expenses-${exportMonth}.csv`;
-    const mimeType = 'text/csv';
-    const blob = new Blob([csvContent], { type: `${mimeType};charset=utf-8;` });
     const count = expensesForExportMonth.length;
     const successMsg = `Exported ${count} expense${count !== 1 ? 's' : ''}`;
+    await shareOrDownloadCsv(csvContent, fileName, `Expenses for ${format(parseISO(`${exportMonth}-01`), 'MMMM yyyy')}`, successMsg);
+    } catch (err) {
+      console.error('Export failed:', err);
+      toast({ title: 'Export failed', description: 'Please try again.', variant: 'destructive' });
+    } finally {
+      setExporting(false);
+    }
+  };
 
-    // Try native share with file first (iOS Safari/PWA, Android Chrome)
+  // Shared share/download helper — reused by expense + budget exports
+  const shareOrDownloadCsv = async (
+    csvContent: string,
+    fileName: string,
+    shareText: string,
+    successMsg: string,
+  ) => {
+    const mimeType = 'text/csv';
+    const blob = new Blob([csvContent], { type: `${mimeType};charset=utf-8;` });
+
     try {
       const file = new File([blob], fileName, { type: mimeType });
       const nav = navigator as Navigator & {
@@ -164,24 +183,15 @@ export default function SettingsPage() {
         share?: (data: ShareData) => Promise<void>;
       };
       if (nav.canShare && nav.share && nav.canShare({ files: [file] })) {
-        await nav.share({
-          files: [file],
-          title: fileName,
-          text: `Expenses for ${format(parseISO(`${exportMonth}-01`), 'MMMM yyyy')}`,
-        });
+        await nav.share({ files: [file], title: fileName, text: shareText });
         toast({ title: successMsg });
         return;
       }
     } catch (err) {
-      // User cancelled share — treat as no-op, don't fall back to download
-      if (err instanceof Error && err.name === 'AbortError') {
-        return;
-      }
-      // Other errors fall through to download
+      if (err instanceof Error && err.name === 'AbortError') return;
       console.warn('Share failed, falling back to download:', err);
     }
 
-    // Fallback: direct download
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -191,13 +201,95 @@ export default function SettingsPage() {
     link.click();
     document.body.removeChild(link);
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-
     toast({ title: successMsg });
+  };
+
+  // Budget summary export
+  const budgetSummaryForMonth = useMemo(() => {
+    if (!exportMonth) return [] as Array<{ category: string; subCategory: string; budget: number; spent: number; remaining: number; percentage: number; isCategoryRow: boolean }>;
+    const [yStr, mStr] = exportMonth.split('-');
+    const year = Number(yStr);
+    const month = Number(mStr);
+
+    const monthlyExpenses = expenses.filter((e) => e.date.startsWith(exportMonth));
+
+    const rows: Array<{ category: string; subCategory: string; budget: number; spent: number; remaining: number; percentage: number; isCategoryRow: boolean }> = [];
+
+    categories.forEach((category) => {
+      const subRows = category.subCategories.map((sub) => {
+        const budget = budgets.find(
+          (b) => b.categoryId === category.id && b.subCategoryId === sub.id && b.month === month && b.year === year,
+        );
+        const budgetAmount = budget?.amount || 0;
+        const spent = monthlyExpenses
+          .filter((e) => e.categoryId === category.id && e.subCategoryId === sub.id)
+          .reduce((sum, e) => sum + e.amount, 0);
+        const remaining = budgetAmount - spent;
+        const percentage = budgetAmount > 0 ? (spent / budgetAmount) * 100 : 0;
+        return {
+          category: category.name,
+          subCategory: sub.name,
+          budget: budgetAmount,
+          spent,
+          remaining,
+          percentage,
+          isCategoryRow: false,
+        };
+      });
+
+      const totalBudget = subRows.reduce((s, r) => s + r.budget, 0);
+      const totalSpent = subRows.reduce((s, r) => s + r.spent, 0);
+      const totalRemaining = totalBudget - totalSpent;
+      const totalPct = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
+
+      // Skip categories with no budget AND no spend at all
+      if (totalBudget === 0 && totalSpent === 0) return;
+
+      rows.push({
+        category: category.name,
+        subCategory: '',
+        budget: totalBudget,
+        spent: totalSpent,
+        remaining: totalRemaining,
+        percentage: totalPct,
+        isCategoryRow: true,
+      });
+      subRows.forEach((r) => {
+        if (r.budget === 0 && r.spent === 0) return;
+        rows.push(r);
+      });
+    });
+
+    return rows;
+  }, [exportMonth, expenses, budgets, categories]);
+
+  const handleExportBudgetCsv = async () => {
+    if (budgetSummaryForMonth.length === 0 || exportingBudget) return;
+    setExportingBudget(true);
+
+    try {
+      const headers = ['Category', 'Sub-category', 'Budget Amount', 'Spent Amount', 'Remaining Amount', 'Percentage Used'];
+      const rows = budgetSummaryForMonth.map((r) => [
+        r.category,
+        r.subCategory,
+        r.budget.toFixed(2),
+        r.spent.toFixed(2),
+        r.remaining.toFixed(2),
+        r.percentage.toFixed(2),
+      ]);
+      const csvLines = [
+        headers.map(escapeCsvField).join(','),
+        ...rows.map((row) => row.map(escapeCsvField).join(',')),
+      ];
+      const csvContent = '\ufeff' + csvLines.join('\n');
+      const fileName = `budget-summary-${exportMonth}.csv`;
+      const monthLabel = format(parseISO(`${exportMonth}-01`), 'MMMM yyyy');
+      await shareOrDownloadCsv(csvContent, fileName, `Budget summary for ${monthLabel}`, 'Budget summary exported');
     } catch (err) {
-      console.error('Export failed:', err);
+      console.error('Budget export failed:', err);
       toast({ title: 'Export failed', description: 'Please try again.', variant: 'destructive' });
     } finally {
-      setExporting(false);
+      setExportingBudget(false);
     }
   };
 
@@ -445,6 +537,29 @@ export default function SettingsPage() {
                   <>
                     <Download className="mr-2 h-4 w-4" />
                     Export Expenses CSV
+                  </>
+                )}
+              </Button>
+
+              {exportMonth && budgetSummaryForMonth.length === 0 && (
+                <p className="text-sm text-muted-foreground">No budget data for this month</p>
+              )}
+
+              <Button
+                onClick={handleExportBudgetCsv}
+                disabled={budgetSummaryForMonth.length === 0 || exportingBudget}
+                variant="outline"
+                className="w-full"
+              >
+                {exportingBudget ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Preparing...
+                  </>
+                ) : (
+                  <>
+                    <Download className="mr-2 h-4 w-4" />
+                    Export Budget Summary CSV
                   </>
                 )}
               </Button>
