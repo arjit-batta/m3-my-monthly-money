@@ -101,6 +101,66 @@ export default function SettingsPage() {
     return paymentModeMap[expense.paymentModeId] || expense.paymentModeId;
   };
 
+  // CSV Export helpers
+  const escapeCsvField = (field: string): string => {
+    if (field.includes(',') || field.includes('"') || field.includes('\n') || field.includes('\r')) {
+      return '"' + field.replace(/"/g, '""') + '"';
+    }
+    return field;
+  };
+
+  const availableMonths = useMemo(() => {
+    const monthSet = new Set<string>();
+    expenses.forEach((exp) => {
+      const d = parseISO(exp.date);
+      monthSet.add(format(d, 'yyyy-MM'));
+    });
+    return Array.from(monthSet).sort((a, b) => b.localeCompare(a));
+  }, [expenses]);
+
+  const expensesForExportMonth = useMemo(() => {
+    if (!exportMonth) return [];
+    return expenses
+      .filter((exp) => exp.date.startsWith(exportMonth))
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }, [expenses, exportMonth]);
+
+  const handleExportCsv = () => {
+    if (expensesForExportMonth.length === 0) return;
+
+    const headers = ['Date', 'Category', 'Sub-category', 'Amount', 'Payment Mode', 'Notes'];
+    const rows = expensesForExportMonth.map((exp) => {
+      const category = categoryMap[exp.categoryId];
+      const subCat = category?.subCategories.find((sc) => sc.id === exp.subCategoryId);
+      return [
+        format(parseISO(exp.date), 'dd MMM yyyy'),
+        category?.name || 'Unknown',
+        subCat?.name || '',
+        String(exp.amount),
+        getPaymentModeName(exp),
+        exp.notes || '',
+      ];
+    });
+
+    const csvLines = [
+      headers.map(escapeCsvField).join(','),
+      ...rows.map((row) => row.map(escapeCsvField).join(',')),
+    ];
+    const csvContent = '\ufeff' + csvLines.join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `expenses-${exportMonth}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    toast({ title: `Exported ${expensesForExportMonth.length} expense${expensesForExportMonth.length !== 1 ? 's' : ''}` });
+  };
+
   const selectedCategory = editForm.categoryId ? categoryMap[editForm.categoryId] : null;
   const subCategories = selectedCategory?.subCategories || [];
 
