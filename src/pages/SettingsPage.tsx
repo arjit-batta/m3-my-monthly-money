@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { format, parseISO } from 'date-fns';
-import { Trash2, Loader2, LogOut } from 'lucide-react';
+import { Trash2, Loader2, LogOut, Download } from 'lucide-react';
 import { AppLayout } from '@/components/AppLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -41,6 +41,7 @@ export default function SettingsPage() {
   const [editForm, setEditForm] = useState<Partial<Expense>>({});
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [exportMonth, setExportMonth] = useState<string>('');
 
   const loadData = useCallback(async () => {
     setError(null);
@@ -98,6 +99,66 @@ export default function SettingsPage() {
 
   const getPaymentModeName = (expense: Expense): string => {
     return paymentModeMap[expense.paymentModeId] || expense.paymentModeId;
+  };
+
+  // CSV Export helpers
+  const escapeCsvField = (field: string): string => {
+    if (field.includes(',') || field.includes('"') || field.includes('\n') || field.includes('\r')) {
+      return '"' + field.replace(/"/g, '""') + '"';
+    }
+    return field;
+  };
+
+  const availableMonths = useMemo(() => {
+    const monthSet = new Set<string>();
+    expenses.forEach((exp) => {
+      const d = parseISO(exp.date);
+      monthSet.add(format(d, 'yyyy-MM'));
+    });
+    return Array.from(monthSet).sort((a, b) => b.localeCompare(a));
+  }, [expenses]);
+
+  const expensesForExportMonth = useMemo(() => {
+    if (!exportMonth) return [];
+    return expenses
+      .filter((exp) => exp.date.startsWith(exportMonth))
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }, [expenses, exportMonth]);
+
+  const handleExportCsv = () => {
+    if (expensesForExportMonth.length === 0) return;
+
+    const headers = ['Date', 'Category', 'Sub-category', 'Amount', 'Payment Mode', 'Notes'];
+    const rows = expensesForExportMonth.map((exp) => {
+      const category = categoryMap[exp.categoryId];
+      const subCat = category?.subCategories.find((sc) => sc.id === exp.subCategoryId);
+      return [
+        format(parseISO(exp.date), 'dd MMM yyyy'),
+        category?.name || 'Unknown',
+        subCat?.name || '',
+        String(exp.amount),
+        getPaymentModeName(exp),
+        exp.notes || '',
+      ];
+    });
+
+    const csvLines = [
+      headers.map(escapeCsvField).join(','),
+      ...rows.map((row) => row.map(escapeCsvField).join(',')),
+    ];
+    const csvContent = '\ufeff' + csvLines.join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `expenses-${exportMonth}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    toast({ title: `Exported ${expensesForExportMonth.length} expense${expensesForExportMonth.length !== 1 ? 's' : ''}` });
   };
 
   const selectedCategory = editForm.categoryId ? categoryMap[editForm.categoryId] : null;
@@ -295,6 +356,52 @@ export default function SettingsPage() {
             <PaymentModeManager />
           </TabsContent>
         </Tabs>
+
+        {/* Reports & Export */}
+        <div className="pt-2">
+          <h2 className="text-base font-semibold mb-3">Reports & Export</h2>
+          <Card>
+            <CardContent className="p-4 space-y-3">
+              <div className="space-y-2">
+                <Label>Month</Label>
+                <Select
+                  value={exportMonth}
+                  onValueChange={setExportMonth}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select month" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover">
+                    {availableMonths.length === 0 ? (
+                      <SelectItem value="__none__" disabled>
+                        No expense data available
+                      </SelectItem>
+                    ) : (
+                      availableMonths.map((m) => (
+                        <SelectItem key={m} value={m}>
+                          {format(parseISO(`${m}-01`), 'MMMM yyyy')}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {exportMonth && expensesForExportMonth.length === 0 && (
+                <p className="text-sm text-muted-foreground">No expenses for this month</p>
+              )}
+
+              <Button
+                onClick={handleExportCsv}
+                disabled={expensesForExportMonth.length === 0}
+                className="w-full"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Export Expenses CSV
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
 
         {/* Version info */}
         <div className="pt-4 text-center">
