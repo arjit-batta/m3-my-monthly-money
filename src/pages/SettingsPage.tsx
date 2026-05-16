@@ -357,6 +357,52 @@ export default function SettingsPage() {
           </TabsContent>
         </Tabs>
 
+        {/* Reports & Export */}
+        <div className="pt-2">
+          <h2 className="text-base font-semibold mb-3">Reports & Export</h2>
+          <Card>
+            <CardContent className="p-4 space-y-3">
+              <div className="space-y-2">
+                <Label>Month</Label>
+                <Select
+                  value={exportMonth}
+                  onValueChange={setExportMonth}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select month" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover">
+                    {availableMonths.length === 0 ? (
+                      <SelectItem value="__none__" disabled>
+                        No expense data available
+                      </SelectItem>
+                    ) : (
+                      availableMonths.map((m) => (
+                        <SelectItem key={m} value={m}>
+                          {format(parseISO(`${m}-01`), 'MMMM yyyy')}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {exportMonth && expensesForExportMonth.length === 0 && (
+                <p className="text-sm text-muted-foreground">No expenses for this month</p>
+              )}
+
+              <Button
+                onClick={handleExportCsv}
+                disabled={expensesForExportMonth.length === 0}
+                className="w-full"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Export Expenses CSV
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Version info */}
         <div className="pt-4 text-center">
           <p className="text-xs text-muted-foreground">
