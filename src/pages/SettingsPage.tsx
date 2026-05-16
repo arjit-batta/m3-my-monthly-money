@@ -12,8 +12,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { getExpenses, getCategories, getPaymentModes, deleteExpense, updateExpense } from '@/lib/database';
-import { Expense, Category, PaymentMode } from '@/types/expense';
+import { getExpenses, getCategories, getPaymentModes, getBudgets, deleteExpense, updateExpense } from '@/lib/database';
+import { Expense, Category, PaymentMode, Budget } from '@/types/expense';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { CategoryManager } from '@/components/CategoryManager';
@@ -43,18 +43,22 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [exportMonth, setExportMonth] = useState<string>('');
   const [exporting, setExporting] = useState(false);
+  const [exportingBudget, setExportingBudget] = useState(false);
+  const [budgets, setBudgets] = useState<Budget[]>([]);
 
   const loadData = useCallback(async () => {
     setError(null);
     try {
-      const [exps, cats, modes] = await Promise.all([
+      const [exps, cats, modes, buds] = await Promise.all([
         getExpenses(),
         getCategories(),
         getPaymentModes(),
+        getBudgets(),
       ]);
       setExpenses(exps);
       setCategories(cats);
       setPaymentModes(modes);
+      setBudgets(buds);
     } catch (err) {
       console.error('Failed to load data:', err);
       setError(err instanceof Error ? err.message : 'Failed to load data');
