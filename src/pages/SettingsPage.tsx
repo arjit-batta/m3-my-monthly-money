@@ -41,6 +41,7 @@ export default function SettingsPage() {
   const [editForm, setEditForm] = useState<Partial<Expense>>({});
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [exportMonth, setExportMonth] = useState<string>('');
 
   const loadData = useCallback(async () => {
     setError(null);
