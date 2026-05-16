@@ -42,6 +42,7 @@ export default function SettingsPage() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [exportMonth, setExportMonth] = useState<string>('');
+  const [exporting, setExporting] = useState(false);
 
   const loadData = useCallback(async () => {
     setError(null);
@@ -125,9 +126,11 @@ export default function SettingsPage() {
       .sort((a, b) => a.date.localeCompare(b.date));
   }, [expenses, exportMonth]);
 
-  const handleExportCsv = () => {
-    if (expensesForExportMonth.length === 0) return;
+  const handleExportCsv = async () => {
+    if (expensesForExportMonth.length === 0 || exporting) return;
+    setExporting(true);
 
+    try {
     const headers = ['Date', 'Category', 'Sub-category', 'Amount', 'Payment Mode', 'Notes'];
     const rows = expensesForExportMonth.map((exp) => {
       const category = categoryMap[exp.categoryId];
@@ -147,18 +150,55 @@ export default function SettingsPage() {
       ...rows.map((row) => row.map(escapeCsvField).join(',')),
     ];
     const csvContent = '\ufeff' + csvLines.join('\n');
+    const fileName = `expenses-${exportMonth}.csv`;
+    const mimeType = 'text/csv';
+    const blob = new Blob([csvContent], { type: `${mimeType};charset=utf-8;` });
+    const count = expensesForExportMonth.length;
+    const successMsg = `Exported ${count} expense${count !== 1 ? 's' : ''}`;
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    // Try native share with file first (iOS Safari/PWA, Android Chrome)
+    try {
+      const file = new File([blob], fileName, { type: mimeType });
+      const nav = navigator as Navigator & {
+        canShare?: (data: ShareData) => boolean;
+        share?: (data: ShareData) => Promise<void>;
+      };
+      if (nav.canShare && nav.share && nav.canShare({ files: [file] })) {
+        await nav.share({
+          files: [file],
+          title: fileName,
+          text: `Expenses for ${format(parseISO(`${exportMonth}-01`), 'MMMM yyyy')}`,
+        });
+        toast({ title: successMsg });
+        return;
+      }
+    } catch (err) {
+      // User cancelled share — treat as no-op, don't fall back to download
+      if (err instanceof Error && err.name === 'AbortError') {
+        return;
+      }
+      // Other errors fall through to download
+      console.warn('Share failed, falling back to download:', err);
+    }
+
+    // Fallback: direct download
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `expenses-${exportMonth}.csv`;
+    link.download = fileName;
+    link.rel = 'noopener';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
 
-    toast({ title: `Exported ${expensesForExportMonth.length} expense${expensesForExportMonth.length !== 1 ? 's' : ''}` });
+    toast({ title: successMsg });
+    } catch (err) {
+      console.error('Export failed:', err);
+      toast({ title: 'Export failed', description: 'Please try again.', variant: 'destructive' });
+    } finally {
+      setExporting(false);
+    }
   };
 
   const selectedCategory = editForm.categoryId ? categoryMap[editForm.categoryId] : null;
@@ -393,11 +433,20 @@ export default function SettingsPage() {
 
               <Button
                 onClick={handleExportCsv}
-                disabled={expensesForExportMonth.length === 0}
+                disabled={expensesForExportMonth.length === 0 || exporting}
                 className="w-full"
               >
-                <Download className="mr-2 h-4 w-4" />
-                Export Expenses CSV
+                {exporting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Preparing...
+                  </>
+                ) : (
+                  <>
+                    <Download className="mr-2 h-4 w-4" />
+                    Export Expenses CSV
+                  </>
+                )}
               </Button>
             </CardContent>
           </Card>
