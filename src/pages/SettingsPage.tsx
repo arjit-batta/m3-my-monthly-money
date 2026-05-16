@@ -540,6 +540,29 @@ export default function SettingsPage() {
                   </>
                 )}
               </Button>
+
+              {exportMonth && budgetSummaryForMonth.length === 0 && (
+                <p className="text-sm text-muted-foreground">No budget data for this month</p>
+              )}
+
+              <Button
+                onClick={handleExportBudgetCsv}
+                disabled={budgetSummaryForMonth.length === 0 || exportingBudget}
+                variant="outline"
+                className="w-full"
+              >
+                {exportingBudget ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Preparing...
+                  </>
+                ) : (
+                  <>
+                    <Download className="mr-2 h-4 w-4" />
+                    Export Budget Summary CSV
+                  </>
+                )}
+              </Button>
             </CardContent>
           </Card>
         </div>
