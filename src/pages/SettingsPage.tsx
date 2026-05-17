@@ -152,9 +152,9 @@ export default function SettingsPage() {
         format(parseISO(exp.date), 'dd MMM yyyy'),
         category?.name || 'Unknown',
         subCat?.name || '',
-        String(exp.amount),
+        exp.amount,
         getPaymentModeName(exp),
-        exp.notes || '',
+        exp.notes,
       ];
     });
 
