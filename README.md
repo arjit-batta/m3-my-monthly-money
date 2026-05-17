@@ -1,73 +1,93 @@
-# Welcome to your Lovable project
+# M3 — My Monthly Money 💰
 
-## Project info
+A mobile-first personal budgeting PWA built for India.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+**Live app:** https://simple-rupee-plan.lovable.app
 
-## How can I edit this code?
+---
 
-There are several ways of editing your application.
+## The Problem
 
-**Use Lovable**
+Most budgeting apps are built for Western markets — they assume credit cards, 
+bank syncing, and simple spending categories. Indian personal finance is more 
+complex: multiple UPI accounts, credit cards across banks, cash, and spending 
+patterns that don't map to Western categories.
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+I couldn't find an app that matched how I actually spend money. So I built one.
 
-Changes made via Lovable will be committed automatically to this repo.
+---
 
-**Use your preferred IDE**
+## What It Does
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+- **Expense tracking** — Log transactions with category, sub-category, payment 
+  mode, and date
+- **Budget management** — Set monthly budgets at category and sub-category level; 
+  track % used in real time
+- **Analytics** — Weekly expense trends, spending by category breakdown, 
+  month-on-month navigation
+- **Payment mode tracking** — Track spend across UPI accounts, credit cards, cash
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+---
 
-Follow these steps:
+## Product Decisions Worth Noting
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+**Why category + sub-category?**
+A single "Food" category isn't useful. Knowing that ₹7,347 went to Food, split 
+across Swiggy, groceries, and eating out — that's actionable. The hierarchy was 
+designed after mapping my own spending patterns for the first month.
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+**Why payment mode tracking?**
+Reward points, cashback, and credit card cycles make payment mode a meaningful 
+variable in Indian personal finance. Knowing I spent ₹1,520 on a specific card 
+matters for optimizing card usage and cashback.
 
-# Step 3: Install the necessary dependencies.
-npm i
+**Why PWA over native app?**
+Zero install friction. Works on mobile browser, can be added to home screen, 
+no App Store approval cycle. Right call for a solo-user MVP.
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
+---
 
-**Edit a file directly in GitHub**
+## Usage
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+- **1000+ transactions** recorded over several months of daily use
+- Used as primary personal finance tool — not a demo, a real product
+- Iterated continuously based on daily dogfooding
 
-**Use GitHub Codespaces**
+---
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## Current Limitations
 
-## What technologies are used for this project?
+- Manual entry only — no bank sync or UPI auto-import
+- Single user — no multi-user or shared expense support
+- No recurring expense automation
 
-This project is built with:
+---
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## Roadmap (Next Features)
 
-## How can I deploy this project?
+- [ ] **Voice expense entry** — Speak "spent 330 on food via Swiggy" → auto-logged
+- [ ] **Monthly AI summary** — LLM-generated end-of-month spending analysis with 
+      patterns and recommendations
+- [ ] **Recurring expense detection** — Auto-identify and suggest automating 
+      fixed monthly expenses
+- [ ] **Budget rollover logic** — Carry unspent budget to next month by category
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+---
 
-## Can I connect a custom domain to my Lovable project?
+## Built With
 
-Yes, you can!
+- **Lovable** — AI-assisted development for rapid prototyping
+- **React + PWA** — Frontend framework
+- **Supabase** — Backend and auth
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+---
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+## Why I Built This as a PM
+
+I wanted hands-on experience shipping a real product end-to-end — not a toy 
+demo, but something I'd use daily and iterate on based on real friction.
+
+The constraint of being a non-technical PM using AI-assisted tools also gave 
+me direct experience with the trade-offs of AI-generated code: speed of 
+prototyping vs. technical debt, prompt quality vs. output quality, and 
+knowing when to accept a shortcut vs. when it'll cost you later.
