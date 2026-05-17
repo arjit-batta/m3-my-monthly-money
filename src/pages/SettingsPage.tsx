@@ -531,7 +531,7 @@ export default function SettingsPage() {
               </div>
 
               {exportMonth && expensesForExportMonth.length === 0 && (
-                <p className="text-sm text-muted-foreground">No expenses for this month</p>
+                <p className="text-sm text-muted-foreground">No expenses available for this month</p>
               )}
 
               <Button
@@ -553,7 +553,7 @@ export default function SettingsPage() {
               </Button>
 
               {exportMonth && budgetSummaryForMonth.length === 0 && (
-                <p className="text-sm text-muted-foreground">No budget data for this month</p>
+                <p className="text-sm text-muted-foreground">No budget data available for this month</p>
               )}
 
               <Button
