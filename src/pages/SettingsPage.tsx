@@ -107,12 +107,21 @@ export default function SettingsPage() {
   };
 
   // CSV Export helpers
-  const escapeCsvField = (field: string): string => {
-    if (field.includes(',') || field.includes('"') || field.includes('\n') || field.includes('\r')) {
-      return '"' + field.replace(/"/g, '""') + '"';
+  const escapeCsvField = (field: unknown): string => {
+    const str = field == null ? '' : String(field);
+    if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+      return '"' + str.replace(/"/g, '""') + '"';
     }
-    return field;
+    return str;
   };
+
+  function formatPercentage(value: unknown): string {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return '';
+    const rounded = Math.round(num * 10) / 10;
+    const formatted = rounded % 1 === 0 ? String(rounded) : rounded.toFixed(1);
+    return `${formatted}%`;
+  }
 
   const availableMonths = useMemo(() => {
     const monthSet = new Set<string>();
@@ -143,9 +152,9 @@ export default function SettingsPage() {
         format(parseISO(exp.date), 'dd MMM yyyy'),
         category?.name || 'Unknown',
         subCat?.name || '',
-        String(exp.amount),
+        exp.amount,
         getPaymentModeName(exp),
-        exp.notes || '',
+        exp.notes,
       ];
     });
 
@@ -275,7 +284,7 @@ export default function SettingsPage() {
         r.budget.toFixed(2),
         r.spent.toFixed(2),
         r.remaining.toFixed(2),
-        r.percentage.toFixed(2),
+        formatPercentage(r.percentage),
       ]);
       const csvLines = [
         headers.map(escapeCsvField).join(','),
@@ -284,7 +293,9 @@ export default function SettingsPage() {
       const csvContent = '\ufeff' + csvLines.join('\n');
       const fileName = `budget-summary-${exportMonth}.csv`;
       const monthLabel = format(parseISO(`${exportMonth}-01`), 'MMMM yyyy');
-      await shareOrDownloadCsv(csvContent, fileName, `Budget summary for ${monthLabel}`, 'Budget summary exported');
+      const count = budgetSummaryForMonth.length;
+      const successMsg = `Exported ${count} budget row${count !== 1 ? 's' : ''}`;
+      await shareOrDownloadCsv(csvContent, fileName, `Budget summary for ${monthLabel}`, successMsg);
     } catch (err) {
       console.error('Budget export failed:', err);
       toast({ title: 'Export failed', description: 'Please try again.', variant: 'destructive' });
@@ -520,7 +531,7 @@ export default function SettingsPage() {
               </div>
 
               {exportMonth && expensesForExportMonth.length === 0 && (
-                <p className="text-sm text-muted-foreground">No expenses for this month</p>
+                <p className="text-sm text-muted-foreground">No expenses available for this month</p>
               )}
 
               <Button
@@ -542,7 +553,7 @@ export default function SettingsPage() {
               </Button>
 
               {exportMonth && budgetSummaryForMonth.length === 0 && (
-                <p className="text-sm text-muted-foreground">No budget data for this month</p>
+                <p className="text-sm text-muted-foreground">No budget data available for this month</p>
               )}
 
               <Button
