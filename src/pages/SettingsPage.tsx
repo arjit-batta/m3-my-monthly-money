@@ -434,10 +434,11 @@ export default function SettingsPage() {
         </div>
 
         <Tabs defaultValue="transactions" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="transactions">Transactions</TabsTrigger>
             <TabsTrigger value="categories" onClick={refreshCategories}>Categories</TabsTrigger>
             <TabsTrigger value="payment-modes" onClick={refreshPaymentModes}>Payment Modes</TabsTrigger>
+            <TabsTrigger value="reports">Reports</TabsTrigger>
           </TabsList>
           
           <TabsContent value="transactions" className="mt-4">
@@ -498,85 +499,83 @@ export default function SettingsPage() {
           <TabsContent value="payment-modes" className="mt-4">
             <PaymentModeManager />
           </TabsContent>
-        </Tabs>
 
-        {/* Reports & Export */}
-        <div className="pt-2">
-          <h2 className="text-base font-semibold mb-3">Reports & Export</h2>
-          <Card>
-            <CardContent className="p-4 space-y-3">
-              <div className="space-y-2">
-                <Label>Month</Label>
-                <Select
-                  value={exportMonth}
-                  onValueChange={setExportMonth}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select month" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-popover">
-                    {availableMonths.length === 0 ? (
-                      <SelectItem value="__none__" disabled>
-                        No expense data available
-                      </SelectItem>
-                    ) : (
-                      availableMonths.map((m) => (
-                        <SelectItem key={m} value={m}>
-                          {format(parseISO(`${m}-01`), 'MMMM yyyy')}
+          <TabsContent value="reports" className="mt-4">
+            <Card>
+              <CardContent className="p-4 space-y-3">
+                <div className="space-y-2">
+                  <Label>Month</Label>
+                  <Select
+                    value={exportMonth}
+                    onValueChange={setExportMonth}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select month" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-popover">
+                      {availableMonths.length === 0 ? (
+                        <SelectItem value="__none__" disabled>
+                          No expense data available
                         </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
+                      ) : (
+                        availableMonths.map((m) => (
+                          <SelectItem key={m} value={m}>
+                            {format(parseISO(`${m}-01`), 'MMMM yyyy')}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-              {exportMonth && expensesForExportMonth.length === 0 && (
-                <p className="text-sm text-muted-foreground">No expenses available for this month</p>
-              )}
-
-              <Button
-                onClick={handleExportCsv}
-                disabled={expensesForExportMonth.length === 0 || exporting}
-                className="w-full"
-              >
-                {exporting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Preparing...
-                  </>
-                ) : (
-                  <>
-                    <Download className="mr-2 h-4 w-4" />
-                    Export Expenses CSV
-                  </>
+                {exportMonth && expensesForExportMonth.length === 0 && (
+                  <p className="text-sm text-muted-foreground">No expenses available for this month</p>
                 )}
-              </Button>
 
-              {exportMonth && budgetSummaryForMonth.length === 0 && (
-                <p className="text-sm text-muted-foreground">No budget data available for this month</p>
-              )}
+                <Button
+                  onClick={handleExportCsv}
+                  disabled={expensesForExportMonth.length === 0 || exporting}
+                  className="w-full"
+                >
+                  {exporting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Preparing...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="mr-2 h-4 w-4" />
+                      Export Expenses CSV
+                    </>
+                  )}
+                </Button>
 
-              <Button
-                onClick={handleExportBudgetCsv}
-                disabled={budgetSummaryForMonth.length === 0 || exportingBudget}
-                variant="outline"
-                className="w-full"
-              >
-                {exportingBudget ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Preparing...
-                  </>
-                ) : (
-                  <>
-                    <Download className="mr-2 h-4 w-4" />
-                    Export Budget Summary CSV
-                  </>
+                {exportMonth && budgetSummaryForMonth.length === 0 && (
+                  <p className="text-sm text-muted-foreground">No budget data available for this month</p>
                 )}
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
+
+                <Button
+                  onClick={handleExportBudgetCsv}
+                  disabled={budgetSummaryForMonth.length === 0 || exportingBudget}
+                  variant="outline"
+                  className="w-full"
+                >
+                  {exportingBudget ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Preparing...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="mr-2 h-4 w-4" />
+                      Export Budget Summary CSV
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
 
         {/* Version info */}
         <div className="pt-4 text-center">
