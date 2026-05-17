@@ -49,7 +49,7 @@ no App Store approval cycle. Right call for a solo-user MVP.
 
 ## Usage
 
-- **1000+ transactions** recorded over several months of daily use
+- **250+ transactions** recorded over several months of daily use
 - Used as primary personal finance tool — not a demo, a real product
 - Iterated continuously based on daily dogfooding
 
