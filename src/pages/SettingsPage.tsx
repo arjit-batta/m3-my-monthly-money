@@ -284,7 +284,7 @@ export default function SettingsPage() {
         r.budget.toFixed(2),
         r.spent.toFixed(2),
         r.remaining.toFixed(2),
-        r.percentage.toFixed(2),
+        formatPercentage(r.percentage),
       ]);
       const csvLines = [
         headers.map(escapeCsvField).join(','),
@@ -293,7 +293,9 @@ export default function SettingsPage() {
       const csvContent = '\ufeff' + csvLines.join('\n');
       const fileName = `budget-summary-${exportMonth}.csv`;
       const monthLabel = format(parseISO(`${exportMonth}-01`), 'MMMM yyyy');
-      await shareOrDownloadCsv(csvContent, fileName, `Budget summary for ${monthLabel}`, 'Budget summary exported');
+      const count = budgetSummaryForMonth.length;
+      const successMsg = `Exported ${count} budget row${count !== 1 ? 's' : ''}`;
+      await shareOrDownloadCsv(csvContent, fileName, `Budget summary for ${monthLabel}`, successMsg);
     } catch (err) {
       console.error('Budget export failed:', err);
       toast({ title: 'Export failed', description: 'Please try again.', variant: 'destructive' });
