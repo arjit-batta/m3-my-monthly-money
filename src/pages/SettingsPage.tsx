@@ -107,12 +107,21 @@ export default function SettingsPage() {
   };
 
   // CSV Export helpers
-  const escapeCsvField = (field: string): string => {
-    if (field.includes(',') || field.includes('"') || field.includes('\n') || field.includes('\r')) {
-      return '"' + field.replace(/"/g, '""') + '"';
+  const escapeCsvField = (field: unknown): string => {
+    const str = field == null ? '' : String(field);
+    if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+      return '"' + str.replace(/"/g, '""') + '"';
     }
-    return field;
+    return str;
   };
+
+  function formatPercentage(value: unknown): string {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return '';
+    const rounded = Math.round(num * 10) / 10;
+    const formatted = rounded % 1 === 0 ? String(rounded) : rounded.toFixed(1);
+    return `${formatted}%`;
+  }
 
   const availableMonths = useMemo(() => {
     const monthSet = new Set<string>();
