@@ -13,6 +13,8 @@ import { toast } from '@/hooks/use-toast';
 import { LoadingState, ErrorState } from '@/components/LoadingError';
 import { withErrorHandling } from '@/lib/db-utils';
 import { CardStrategyEditor } from '@/components/CardStrategyEditor';
+import { CardStrategyFields } from '@/components/CardStrategyFields';
+import { CardStrategyInput, upsertCardStrategy } from '@/lib/cardStrategies';
 
 const PAYMENT_MODE_TYPES: { value: PaymentModeType; label: string }[] = [
   { value: 'credit_card', label: 'Credit Card' },
@@ -34,6 +36,13 @@ export function PaymentModeManager() {
   // Form states
   const [name, setName] = useState('');
   const [type, setType] = useState<PaymentModeType | ''>('');
+  const defaultStrategy: CardStrategyInput = {
+    tags: [],
+    keepAlive: false,
+    keepAliveCadenceDays: 30,
+    note: null,
+  };
+  const [strategyDraft, setStrategyDraft] = useState<CardStrategyInput>(defaultStrategy);
 
   const loadData = useCallback(async () => {
     setError(null);
@@ -59,6 +68,7 @@ export function PaymentModeManager() {
   const resetForm = () => {
     setName('');
     setType('');
+    setStrategyDraft(defaultStrategy);
   };
 
   const openAddSheet = () => {
@@ -86,14 +96,35 @@ export function PaymentModeManager() {
       type: type || undefined,
     }));
     
-    setSaving(false);
-
     if (result.success === true) {
+      const newId = (result as { success: true; data: string }).data;
+      if (type === 'credit_card') {
+        const hasStrategyData =
+          strategyDraft.tags.length > 0 ||
+          strategyDraft.keepAlive ||
+          (strategyDraft.note?.trim().length ?? 0) > 0;
+        if (hasStrategyData) {
+          try {
+            await upsertCardStrategy(newId, {
+              ...strategyDraft,
+              keepAliveCadenceDays: strategyDraft.keepAlive
+                ? Math.max(1, strategyDraft.keepAliveCadenceDays || 30)
+                : 30,
+              note: strategyDraft.note?.trim() ? strategyDraft.note.trim() : null,
+            });
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            toast({ title: 'Payment mode added, but strategy failed', description: message, variant: 'destructive' });
+          }
+        }
+      }
+      setSaving(false);
       await loadData();
       setIsAddSheetOpen(false);
       resetForm();
       toast({ title: 'Payment mode added' });
     } else {
+      setSaving(false);
       const failedResult = result as { success: false; error: string; isNetworkError: boolean };
       toast({ 
         title: failedResult.isNetworkError ? 'Connection Error' : 'Failed to add payment mode',
@@ -252,7 +283,7 @@ export function PaymentModeManager() {
 
       {/* Add Sheet */}
       <Sheet open={isAddSheetOpen} onOpenChange={setIsAddSheetOpen}>
-        <SheetContent side="bottom" className="h-auto">
+        <SheetContent side="bottom" className="max-h-[90vh] overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Add Payment Mode</SheetTitle>
           </SheetHeader>
@@ -280,6 +311,9 @@ export function PaymentModeManager() {
                 </SelectContent>
               </Select>
             </div>
+            {type === 'credit_card' && (
+              <CardStrategyFields value={strategyDraft} onChange={setStrategyDraft} />
+            )}
             <Button onClick={handleAdd} className="w-full" disabled={saving}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Add Payment Mode
