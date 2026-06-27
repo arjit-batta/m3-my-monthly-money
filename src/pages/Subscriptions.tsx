@@ -391,16 +391,23 @@ export default function SubscriptionsPage() {
             <div className="space-y-1.5">
               <Label>Manage / cancel via (optional)</Label>
               <Select
-                value={form.source}
-                onValueChange={(v) => setForm({ ...form, source: v as SubscriptionSource })}
+                value={form.source || ''}
+                onValueChange={(v) => setForm({ ...form, source: v })}
               >
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                 <SelectContent>
-                  {(Object.keys(SOURCE_LABEL) as SubscriptionSource[]).map((s) => (
-                    <SelectItem key={s} value={s}>{SOURCE_LABEL[s]}</SelectItem>
+                  {SOURCE_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {form.source === OTHER_VALUE && (
+                <Input
+                  value={otherSource}
+                  onChange={(e) => setOtherSource(e.target.value)}
+                  placeholder="e.g. Email support, dealer, etc."
+                />
+              )}
               <p className="text-xs text-muted-foreground">
                 Where you go to change or cancel this — e.g. App Store, Play Store, UPI Autopay, or the provider's website.
               </p>
