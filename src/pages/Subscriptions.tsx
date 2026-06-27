@@ -83,7 +83,7 @@ const emptyForm: SubscriptionInput = {
   status: 'active',
 };
 
-export default function SubscriptionsPage() {
+export function SubscriptionsView() {
   const [subs, setSubs] = useState<Subscription[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [paymentModes, setPaymentModes] = useState<PaymentMode[]>([]);
@@ -204,29 +204,21 @@ export default function SubscriptionsPage() {
   };
 
   if (loading) {
-    return (
-      <AppLayout>
-        <LoadingState className="py-20" />
-      </AppLayout>
-    );
+    return <LoadingState className="py-20" />;
   }
 
   if (error) {
     return (
-      <AppLayout>
-        <div className="pt-6">
-          <h1 className="text-xl font-semibold mb-4">Subscriptions</h1>
-          <ErrorState message={error} onRetry={load} />
-        </div>
-      </AppLayout>
+      <div>
+        <ErrorState message={error} onRetry={load} />
+      </div>
     );
   }
 
   return (
-    <AppLayout>
+    <>
       <div className="space-y-4 pb-6">
-        <div className="pt-6 flex items-center justify-between">
-          <h1 className="text-xl font-semibold">Subscriptions</h1>
+        <div className="flex items-center justify-end">
           <Button size="sm" onClick={openAdd}>
             <Plus className="mr-1 h-4 w-4" />
             Add
@@ -471,6 +463,17 @@ export default function SubscriptionsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </>
+  );
+}
+
+export default function SubscriptionsPage() {
+  return (
+    <AppLayout>
+      <div className="pt-6">
+        <h1 className="text-xl font-semibold mb-4">Subscriptions</h1>
+        <SubscriptionsView />
+      </div>
     </AppLayout>
   );
 }

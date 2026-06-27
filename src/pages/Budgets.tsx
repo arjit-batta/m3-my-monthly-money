@@ -8,6 +8,8 @@ import { BudgetCard } from '@/components/BudgetCard';
 import { BudgetEditor } from '@/components/BudgetEditor';
 import { useBudgetData } from '@/hooks/useBudgetData';
 import { LoadingState, ErrorState, EmptyState } from '@/components/LoadingError';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { SubscriptionsView } from '@/pages/Subscriptions';
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-IN', {
@@ -93,10 +95,19 @@ export default function Budgets() {
   return (
     <AppLayout>
       <div className="space-y-6 pb-6">
-        {/* Header with month navigation */}
-        <div className="flex items-center justify-between pt-6">
-          <h1 className="text-xl font-semibold">Budgets</h1>
-          <div className="flex items-center gap-2">
+        <div className="pt-6">
+          <h1 className="text-xl font-semibold">Spending</h1>
+        </div>
+
+        <Tabs defaultValue="budgets" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="budgets">Budgets</TabsTrigger>
+            <TabsTrigger value="subs">Subs</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="budgets" className="mt-4 space-y-6">
+            {/* Month navigation */}
+            <div className="flex items-center justify-end gap-2">
             <Button variant="ghost" size="icon" onClick={goToPrevMonth}>
               <ChevronLeft className="h-5 w-5" />
             </Button>
@@ -104,8 +115,7 @@ export default function Budgets() {
             <Button variant="ghost" size="icon" onClick={goToNextMonth}>
               <ChevronRight className="h-5 w-5" />
             </Button>
-          </div>
-        </div>
+            </div>
 
         {/* Error state */}
         {error && !loading && (
@@ -176,6 +186,12 @@ export default function Budgets() {
             )}
           </>
         )}
+          </TabsContent>
+
+          <TabsContent value="subs" className="mt-4">
+            <SubscriptionsView />
+          </TabsContent>
+        </Tabs>
       </div>
 
       <BudgetEditor
