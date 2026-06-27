@@ -14,6 +14,8 @@ import Account from "./pages/Account";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import Terms from "./pages/Terms";
 import Auth from "./pages/Auth";
+import ResetPassword from "./pages/ResetPassword";
+import ChangePassword from "./pages/ChangePassword";
 import NotFound from "./pages/NotFound";
 import { RenewalPrompts } from "@/components/RenewalPrompts";
 
@@ -66,6 +68,8 @@ const App = () => (
           <RenewalPrompts />
           <Routes>
             <Route path="/auth" element={<AuthRoute><Auth /></AuthRoute>} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/change-password" element={<ProtectedRoute><ChangePassword /></ProtectedRoute>} />
             <Route path="/" element={<ProtectedRoute><AddExpense /></ProtectedRoute>} />
             <Route path="/budgets" element={<ProtectedRoute><Budgets /></ProtectedRoute>} />
             <Route path="/subscriptions" element={<ProtectedRoute><Subscriptions /></ProtectedRoute>} />
