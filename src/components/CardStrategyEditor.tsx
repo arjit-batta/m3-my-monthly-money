@@ -84,7 +84,8 @@ export function CardStrategyEditor({ paymentModeId }: Props) {
       toast({ title: 'Strategy saved' });
     } catch (err) {
       console.error(err);
-      toast({ title: 'Failed to save strategy', variant: 'destructive' });
+      const message = err instanceof Error ? err.message : String(err);
+      toast({ title: 'Failed to save strategy', description: message, variant: 'destructive' });
     } finally {
       setSaving(false);
     }
