@@ -65,6 +65,53 @@ export type Database = {
           },
         ]
       }
+      card_strategies: {
+        Row: {
+          billing_cycle_start_day: number | null
+          created_at: string
+          id: string
+          keep_alive: boolean
+          keep_alive_cadence_days: number
+          note: string | null
+          payment_mode_id: string
+          tags: string[]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          billing_cycle_start_day?: number | null
+          created_at?: string
+          id?: string
+          keep_alive?: boolean
+          keep_alive_cadence_days?: number
+          note?: string | null
+          payment_mode_id: string
+          tags?: string[]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          billing_cycle_start_day?: number | null
+          created_at?: string
+          id?: string
+          keep_alive?: boolean
+          keep_alive_cadence_days?: number
+          note?: string | null
+          payment_mode_id?: string
+          tags?: string[]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_strategies_payment_mode_id_fkey"
+            columns: ["payment_mode_id"]
+            isOneToOne: false
+            referencedRelation: "payment_modes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       categories: {
         Row: {
           created_at: string
@@ -205,6 +252,66 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subscriptions: {
+        Row: {
+          amount: number
+          cadence: string
+          category_id: string | null
+          created_at: string
+          id: string
+          name: string
+          next_renewal_date: string
+          payment_mode_id: string | null
+          source: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          cadence: string
+          category_id?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          next_renewal_date: string
+          payment_mode_id?: string | null
+          source: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          cadence?: string
+          category_id?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          next_renewal_date?: string
+          payment_mode_id?: string | null
+          source?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_payment_mode_id_fkey"
+            columns: ["payment_mode_id"]
+            isOneToOne: false
+            referencedRelation: "payment_modes"
             referencedColumns: ["id"]
           },
         ]
