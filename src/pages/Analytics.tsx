@@ -13,6 +13,8 @@ import { getExpenses, getCategories, getPaymentModes } from '@/lib/database';
 import { cn } from '@/lib/utils';
 import { Category, PaymentMode, Expense } from '@/types/expense';
 import { LoadingState, ErrorState } from '@/components/LoadingError';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { StrategyView } from '@/pages/Strategy';
 
 const COLORS = ['#2563eb', '#16a34a', '#ea580c', '#8b5cf6', '#ec4899', '#14b8a6', '#f59e0b', '#6366f1'];
 
@@ -246,7 +248,13 @@ export default function Analytics() {
 
   return (
     <AppLayout>
-      <div className="space-y-4 pb-6">
+      <Tabs defaultValue="analytics" className="pt-4">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          <TabsTrigger value="strategy">Strategy</TabsTrigger>
+        </TabsList>
+        <TabsContent value="analytics">
+        <div className="space-y-4 pb-6">
         {/* Header with month navigation */}
         <div className="flex items-center justify-between pt-6">
           <h1 className="text-xl font-semibold">Analytics</h1>
@@ -553,7 +561,12 @@ export default function Analytics() {
             </CardContent>
           </Card>
         )}
-      </div>
+        </div>
+        </TabsContent>
+        <TabsContent value="strategy">
+          <StrategyView />
+        </TabsContent>
+      </Tabs>
     </AppLayout>
   );
 }
