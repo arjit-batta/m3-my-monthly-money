@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import AddExpense from "./pages/AddExpense";
 import Budgets from "./pages/Budgets";
 import Subscriptions from "./pages/Subscriptions";
+import Strategy from "./pages/Strategy";
 import Analytics from "./pages/Analytics";
 import SettingsPage from "./pages/SettingsPage";
 import Auth from "./pages/Auth";
@@ -63,6 +64,7 @@ const App = () => (
             <Route path="/" element={<ProtectedRoute><AddExpense /></ProtectedRoute>} />
             <Route path="/budgets" element={<ProtectedRoute><Budgets /></ProtectedRoute>} />
             <Route path="/subscriptions" element={<ProtectedRoute><Subscriptions /></ProtectedRoute>} />
+            <Route path="/strategy" element={<ProtectedRoute><Strategy /></ProtectedRoute>} />
             <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
