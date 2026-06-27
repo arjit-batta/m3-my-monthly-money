@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { format, parseISO } from 'date-fns';
-import { Trash2, Loader2 } from 'lucide-react';
+import { Trash2, Loader2, StickyNote } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -200,19 +200,25 @@ export function TransactionsView() {
                 onClick={() => openEditSheet(expense)}
               >
                 <CardContent className="flex items-center justify-between p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-lg">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-lg">
                       {category?.icon || '📦'}
                     </div>
-                    <div>
+                    <div className="min-w-0 flex-1">
                       <p className="font-medium">{category?.name || 'Unknown'}</p>
                       <p className="text-xs text-muted-foreground">
                         {subCategoryName && `${subCategoryName} · `}
                         {getPaymentModeName(expense)}
                       </p>
+                      {expense.notes?.trim() && (
+                        <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+                          <StickyNote className="h-3 w-3 shrink-0" />
+                          <span className="truncate">{expense.notes}</span>
+                        </p>
+                      )}
                     </div>
                   </div>
-                  <div className="text-right">
+                  <div className="text-right shrink-0 pl-2">
                     <p className="font-semibold">{formatCurrency(expense.amount)}</p>
                     <p className="text-xs text-muted-foreground">
                       {format(parseISO(expense.date), 'd MMM yyyy')}
