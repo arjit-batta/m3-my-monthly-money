@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { format, getDaysInMonth } from 'date-fns';
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { AppLayout } from '@/components/AppLayout';
@@ -11,6 +11,7 @@ import { LoadingState, ErrorState, EmptyState } from '@/components/LoadingError'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SubscriptionsView } from '@/pages/Subscriptions';
 import { TransactionsView } from '@/components/TransactionsView';
+import { getSubscriptions, totalMonthlyBurn, Subscription } from '@/lib/subscriptions';
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-IN', {
@@ -34,6 +35,13 @@ export default function Budgets() {
   const [editAmount, setEditAmount] = useState(0);
 
   const { categories, totalBudget, totalSpent, remaining, loading, error, refetch } = useBudgetData(month, year, refreshKey);
+
+  const [tab, setTab] = useState('budgets');
+  const [subs, setSubs] = useState<Subscription[]>([]);
+  useEffect(() => {
+    getSubscriptions().then(setSubs).catch(() => setSubs([]));
+  }, []);
+  const subsMonthly = useMemo(() => totalMonthlyBurn(subs), [subs]);
 
   const goToPrevMonth = () => {
     if (month === 1) {
@@ -100,7 +108,7 @@ export default function Budgets() {
           <h1 className="text-xl font-semibold">Spending</h1>
         </div>
 
-        <Tabs defaultValue="budgets" className="w-full">
+        <Tabs value={tab} onValueChange={setTab} className="w-full">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="budgets">Budgets</TabsTrigger>
             <TabsTrigger value="transactions">Transactions</TabsTrigger>
@@ -108,6 +116,15 @@ export default function Budgets() {
           </TabsList>
 
           <TabsContent value="budgets" className="mt-4 space-y-6">
+            {/* Subscriptions summary */}
+            <button
+              type="button"
+              onClick={() => setTab('subs')}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors w-full text-left"
+            >
+              Subscriptions · {formatCurrency(subsMonthly)}/mo
+            </button>
+
             {/* Month navigation */}
             <div className="flex items-center justify-end gap-2">
             <Button variant="ghost" size="icon" onClick={goToPrevMonth}>
