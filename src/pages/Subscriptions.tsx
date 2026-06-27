@@ -60,7 +60,7 @@ const SOURCE_OPTIONS: { value: string; label: string }[] = [
   { value: 'play_store', label: 'Play Store (Google)' },
   { value: 'upi_autopay', label: 'UPI Autopay' },
   { value: 'card_mandate', label: 'Card / bank mandate' },
-  { value: 'provider', label: 'Provider app or website' },
+  { value: 'provider_direct', label: 'Provider app or website' },
   { value: 'other', label: 'Other' },
 ];
 const SOURCE_KEYS = new Set(SOURCE_OPTIONS.map((o) => o.value));
@@ -79,7 +79,8 @@ const emptyForm: SubscriptionInput = {
   nextRenewalDate: format(new Date(), 'yyyy-MM-dd'),
   paymentModeId: null,
   categoryId: null,
-  source: 'card',
+  source: null,
+  sourceOther: null,
   status: 'active',
 };
 
@@ -134,7 +135,7 @@ export function SubscriptionsView() {
 
   const openEdit = (sub: Subscription) => {
     setEditingId(sub.id);
-    const isKnown = SOURCE_KEYS.has(sub.source);
+    const isKnown = sub.source != null && SOURCE_KEYS.has(sub.source);
     setForm({
       name: sub.name,
       amount: sub.amount,
@@ -142,10 +143,11 @@ export function SubscriptionsView() {
       nextRenewalDate: sub.nextRenewalDate,
       paymentModeId: sub.paymentModeId,
       categoryId: sub.categoryId,
-      source: isKnown ? sub.source : OTHER_VALUE,
+      source: sub.source ?? null,
+      sourceOther: sub.sourceOther ?? '',
       status: sub.status,
     });
-    setOtherSource(isKnown ? '' : (sub.source || ''));
+    setOtherSource(sub.sourceOther ?? '');
     setSheetOpen(true);
   };
 
@@ -170,7 +172,7 @@ export function SubscriptionsView() {
     try {
       const payload: SubscriptionInput = {
         ...form,
-        source: form.source === OTHER_VALUE ? otherSource.trim() : form.source,
+        sourceOther: form.source === OTHER_VALUE ? otherSource.trim() : null,
       };
       if (editingId) {
         await updateSubscription(editingId, payload);
@@ -183,7 +185,8 @@ export function SubscriptionsView() {
       await load();
     } catch (err) {
       console.error(err);
-      toast({ title: 'Failed to save', variant: 'destructive' });
+      const message = err instanceof Error ? err.message : (typeof err === 'object' && err && 'message' in err ? String((err as { message: unknown }).message) : 'Failed to save');
+      toast({ title: 'Failed to save subscription', description: message, variant: 'destructive' });
     } finally {
       setSaving(false);
     }
@@ -384,7 +387,7 @@ export function SubscriptionsView() {
               <Label>Manage / cancel via (optional)</Label>
               <Select
                 value={form.source || ''}
-                onValueChange={(v) => setForm({ ...form, source: v })}
+                onValueChange={(v) => setForm({ ...form, source: v as SubscriptionSource })}
               >
                 <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                 <SelectContent>

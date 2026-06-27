@@ -1,7 +1,13 @@
 import { supabase } from '@/integrations/supabase/client';
 
 export type SubscriptionCadence = 'monthly' | 'quarterly' | 'annual';
-export type SubscriptionSource = string;
+export type SubscriptionSource =
+  | 'app_store'
+  | 'play_store'
+  | 'upi_autopay'
+  | 'card_mandate'
+  | 'provider_direct'
+  | 'other';
 export type SubscriptionStatus = 'active' | 'paused' | 'cancelled';
 
 export interface Subscription {
@@ -12,7 +18,8 @@ export interface Subscription {
   nextRenewalDate: string; // YYYY-MM-DD
   paymentModeId: string | null;
   categoryId: string | null;
-  source: SubscriptionSource;
+  source: SubscriptionSource | null;
+  sourceOther: string | null;
   status: SubscriptionStatus;
   createdAt: string;
   updatedAt: string;
@@ -25,7 +32,8 @@ export interface SubscriptionInput {
   nextRenewalDate: string;
   paymentModeId: string | null;
   categoryId: string | null;
-  source: SubscriptionSource;
+  source: SubscriptionSource | null;
+  sourceOther: string | null;
   status: SubscriptionStatus;
 }
 
@@ -43,7 +51,8 @@ function mapRow(row: {
   next_renewal_date: string;
   payment_mode_id: string | null;
   category_id: string | null;
-  source: string;
+  source: string | null;
+  source_other?: string | null;
   status: string;
   created_at: string;
   updated_at: string;
@@ -56,7 +65,8 @@ function mapRow(row: {
     nextRenewalDate: row.next_renewal_date,
     paymentModeId: row.payment_mode_id,
     categoryId: row.category_id,
-    source: row.source as SubscriptionSource,
+    source: (row.source as SubscriptionSource | null) ?? null,
+    sourceOther: row.source_other ?? null,
     status: row.status as SubscriptionStatus,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -87,8 +97,9 @@ export async function addSubscription(input: SubscriptionInput): Promise<string>
       payment_mode_id: input.paymentModeId,
       category_id: input.categoryId,
       source: input.source,
+      source_other: input.source === 'other' ? (input.sourceOther?.trim() || null) : null,
       status: input.status,
-    })
+    } as never)
     .select()
     .single();
   if (error) throw error;
@@ -106,6 +117,7 @@ export async function updateSubscription(id: string, input: SubscriptionInput): 
       payment_mode_id: input.paymentModeId,
       category_id: input.categoryId,
       source: input.source,
+      source_other: input.source === 'other' ? (input.sourceOther?.trim() || null) : null,
       status: input.status,
     } as never)
     .eq('id', id);
