@@ -332,10 +332,10 @@ export default function SettingsPage() {
           </Button>
         </div>
 
-        <Tabs defaultValue="categories" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+        <Tabs defaultValue="categories" className="w-full pt-2">
+          <TabsList className="grid w-full grid-cols-3 gap-1">
             <TabsTrigger value="categories" onClick={refreshCategories}>Categories</TabsTrigger>
-            <TabsTrigger value="payment-modes" onClick={refreshPaymentModes}>Payment Modes</TabsTrigger>
+            <TabsTrigger value="payment-modes" onClick={refreshPaymentModes}>Payments</TabsTrigger>
             <TabsTrigger value="reports">Reports</TabsTrigger>
           </TabsList>
 
