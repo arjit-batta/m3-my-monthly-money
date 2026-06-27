@@ -31,6 +31,7 @@ interface CardRow {
   monthSpend: number;
   daysSinceLastUsed: number | null;
   state: 'ok' | 'approaching' | 'dormant' | 'unused';
+  keptAliveBy: { name: string; daysUntil: number } | null;
 }
 
 function classifyKeepAlive(days: number | null, cadence: number): CardRow['state'] {
@@ -106,12 +107,30 @@ export default function Strategy() {
           .slice(-1)[0];
         daysSinceLastUsed = differenceInCalendarDays(today, parseISO(last));
       }
-      const state = strategy?.keepAlive
-        ? classifyKeepAlive(daysSinceLastUsed, strategy.keepAliveCadenceDays || 30)
+      const cadence = strategy?.keepAliveCadenceDays || 30;
+      const cardSubs = subs
+        .filter((s) => s.status === 'active' && s.paymentModeId === mode.id)
+        .map((s) => ({ sub: s, days: differenceInCalendarDays(parseISO(s.nextRenewalDate), today) }))
+        .filter(({ days }) => days >= 0)
+        .sort((a, b) => a.days - b.days);
+      const nextSub = cardSubs[0] ?? null;
+      const keptAliveBy = strategy?.keepAlive && nextSub
+        ? { name: nextSub.sub.name, daysUntil: nextSub.days }
+        : null;
+      let state = strategy?.keepAlive
+        ? classifyKeepAlive(daysSinceLastUsed, cadence)
         : 'ok';
-      return { mode, strategy, monthSpend, daysSinceLastUsed, state };
+      if (
+        strategy?.keepAlive &&
+        nextSub &&
+        nextSub.days <= cadence &&
+        (state === 'approaching' || state === 'dormant' || state === 'unused')
+      ) {
+        state = 'ok';
+      }
+      return { mode, strategy, monthSpend, daysSinceLastUsed, state, keptAliveBy };
     });
-  }, [modes, strategies, expenses, monthStart, today]);
+  }, [modes, strategies, expenses, subs, monthStart, today]);
 
   const upcomingRenewals = useMemo(() => {
     return subs
@@ -239,6 +258,17 @@ export default function Strategy() {
                       </>
                     )}
                   </div>
+
+                  {row.keptAliveBy && (
+                    <p className="text-xs text-muted-foreground">
+                      Kept alive by {row.keptAliveBy.name} — next charge{' '}
+                      {row.keptAliveBy.daysUntil === 0
+                        ? 'today'
+                        : row.keptAliveBy.daysUntil === 1
+                          ? 'tomorrow'
+                          : `in ${row.keptAliveBy.daysUntil} days`}
+                    </p>
+                  )}
                 </CardContent>
               </Card>
             ))
