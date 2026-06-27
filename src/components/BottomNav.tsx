@@ -1,10 +1,11 @@
 import { NavLink } from '@/components/NavLink';
-import { PlusCircle, Wallet, BarChart3, Settings, Repeat } from 'lucide-react';
+import { PlusCircle, Wallet, BarChart3, Settings, Repeat, Sparkles } from 'lucide-react';
 
 const navItems = [
   { to: '/', label: 'Add', icon: PlusCircle },
   { to: '/budgets', label: 'Budgets', icon: Wallet },
   { to: '/subscriptions', label: 'Subs', icon: Repeat },
+  { to: '/strategy', label: 'Strategy', icon: Sparkles },
   { to: '/analytics', label: 'Analytics', icon: BarChart3 },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
@@ -18,7 +19,7 @@ export function BottomNav() {
             key={item.to}
             to={item.to}
             end
-            className="flex flex-col items-center gap-1 px-3 py-2 text-muted-foreground transition-colors"
+            className="flex flex-col items-center gap-1 px-2 py-2 text-muted-foreground transition-colors"
             activeClassName="text-primary"
           >
             <item.icon className="h-5 w-5" />
