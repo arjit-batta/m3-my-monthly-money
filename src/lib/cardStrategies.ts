@@ -70,3 +70,21 @@ export const SUGGESTED_CARD_TAGS = [
   'lounge',
   'fuel',
 ];
+
+export async function getAllCardStrategies(): Promise<CardStrategy[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+  const { data, error } = await supabase
+    .from('card_strategies')
+    .select('*')
+    .eq('user_id', user.id);
+  if (error) throw error;
+  return (data || []).map((row) => ({
+    id: row.id,
+    paymentModeId: row.payment_mode_id,
+    tags: row.tags ?? [],
+    keepAlive: row.keep_alive,
+    keepAliveCadenceDays: row.keep_alive_cadence_days,
+    note: row.note,
+  }));
+}
