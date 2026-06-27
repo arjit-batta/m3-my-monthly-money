@@ -221,6 +221,24 @@ export type Database = {
         }
         Relationships: []
       }
+      profiles: {
+        Row: {
+          created_at: string
+          id: string
+          is_premium: boolean
+        }
+        Insert: {
+          created_at?: string
+          id: string
+          is_premium?: boolean
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_premium?: boolean
+        }
+        Relationships: []
+      }
       sub_categories: {
         Row: {
           category_id: string
