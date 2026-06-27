@@ -1,15 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ChevronLeft, KeyRound, FileText, ShieldCheck, Mail, Trash2, LogOut, Loader2 } from 'lucide-react';
 import { AppLayout } from '@/components/AppLayout';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
-} from '@/components/ui/dialog';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -25,10 +20,6 @@ export default function Account() {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const [isPremium, setIsPremium] = useState(false);
-  const [pwOpen, setPwOpen] = useState(false);
-  const [newPw, setNewPw] = useState('');
-  const [confirmPw, setConfirmPw] = useState('');
-  const [savingPw, setSavingPw] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -37,27 +28,6 @@ export default function Account() {
   }, []);
 
   const initial = (user?.email?.[0] || '?').toUpperCase();
-
-  const handleChangePassword = async () => {
-    if (newPw.length < 6) {
-      toast({ title: 'Password too short', description: 'Use at least 6 characters.', variant: 'destructive' });
-      return;
-    }
-    if (newPw !== confirmPw) {
-      toast({ title: 'Passwords do not match', variant: 'destructive' });
-      return;
-    }
-    setSavingPw(true);
-    const { error } = await supabase.auth.updateUser({ password: newPw });
-    setSavingPw(false);
-    if (error) {
-      toast({ title: 'Failed to update password', description: error.message, variant: 'destructive' });
-      return;
-    }
-    setPwOpen(false);
-    setNewPw(''); setConfirmPw('');
-    toast({ title: 'Password updated' });
-  };
 
   const handleDelete = async () => {
     if (!user) return;
@@ -113,7 +83,7 @@ export default function Account() {
         <Card className="divide-y">
           <button
             className="w-full flex items-center gap-3 p-4 text-left active:bg-muted/60 transition-colors"
-            onClick={() => setPwOpen(true)}
+            onClick={() => navigate('/change-password')}
           >
             <KeyRound className="h-5 w-5 text-muted-foreground" />
             <span className="flex-1 text-sm">Change password</span>
@@ -159,32 +129,6 @@ export default function Account() {
 
         <p className="text-center text-xs text-muted-foreground pt-2">Version 0.1.0</p>
       </div>
-
-      <Dialog open={pwOpen} onOpenChange={setPwOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Change password</DialogTitle>
-            <DialogDescription>Enter a new password for your account.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-1">
-              <Label htmlFor="new-pw">New password</Label>
-              <Input id="new-pw" type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="confirm-pw">Confirm password</Label>
-              <Input id="confirm-pw" type="password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setPwOpen(false)} disabled={savingPw}>Cancel</Button>
-            <Button onClick={handleChangePassword} disabled={savingPw}>
-              {savingPw && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Update
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
