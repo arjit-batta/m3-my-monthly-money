@@ -41,7 +41,7 @@ function classifyKeepAlive(days: number | null, cadence: number): CardRow['state
   return 'ok';
 }
 
-export default function Strategy() {
+export function StrategyView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isPremium, setIsPremium] = useState(false);
@@ -145,28 +145,23 @@ export default function Strategy() {
 
   if (loading) {
     return (
-      <AppLayout>
-        <div className="py-6">
-          <LoadingState />
-        </div>
-      </AppLayout>
+      <div className="py-6">
+        <LoadingState />
+      </div>
     );
   }
 
   if (error) {
     return (
-      <AppLayout>
-        <div className="py-6">
-          <ErrorState message={error} />
-        </div>
-      </AppLayout>
+      <div className="py-6">
+        <ErrorState message={error} />
+      </div>
     );
   }
 
   if (!isPremium) {
     return (
-      <AppLayout>
-        <div className="py-10 text-center space-y-4">
+      <div className="py-10 text-center space-y-4">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-muted">
             <Lock className="h-7 w-7 text-muted-foreground" />
           </div>
@@ -177,8 +172,7 @@ export default function Strategy() {
             Card &amp; Subscription Strategy is a premium feature. Upgrade to track keep-alive
             cards, monthly card spend, and upcoming subscription renewals in one place.
           </p>
-        </div>
-      </AppLayout>
+      </div>
     );
   }
 
@@ -187,8 +181,7 @@ export default function Strategy() {
     id ? modes.find((m) => m.id === id)?.name ?? 'Unknown' : '—';
 
   return (
-    <AppLayout>
-      <div className="py-4 space-y-6">
+    <div className="py-4 space-y-6">
         <header>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Sparkles className="h-6 w-6 text-primary" /> Strategy
@@ -317,7 +310,14 @@ export default function Strategy() {
             )}
           </div>
         </section>
-      </div>
+    </div>
+  );
+}
+
+export default function Strategy() {
+  return (
+    <AppLayout>
+      <StrategyView />
     </AppLayout>
   );
 }

@@ -1,10 +1,9 @@
 import { NavLink } from '@/components/NavLink';
-import { PlusCircle, Wallet, BarChart3, Settings, Sparkles } from 'lucide-react';
+import { PlusCircle, Wallet, BarChart3, Settings } from 'lucide-react';
 
 const navItems = [
   { to: '/', label: 'Add', icon: PlusCircle },
   { to: '/budgets', label: 'Spending', icon: Wallet },
-  { to: '/strategy', label: 'Strategy', icon: Sparkles },
   { to: '/analytics', label: 'Analytics', icon: BarChart3 },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
