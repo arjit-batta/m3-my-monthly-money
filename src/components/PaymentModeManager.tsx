@@ -283,7 +283,7 @@ export function PaymentModeManager() {
 
       {/* Add Sheet */}
       <Sheet open={isAddSheetOpen} onOpenChange={setIsAddSheetOpen}>
-        <SheetContent side="bottom" className="h-auto">
+        <SheetContent side="bottom" className="max-h-[90vh] overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Add Payment Mode</SheetTitle>
           </SheetHeader>
@@ -311,6 +311,9 @@ export function PaymentModeManager() {
                 </SelectContent>
               </Select>
             </div>
+            {type === 'credit_card' && (
+              <CardStrategyFields value={strategyDraft} onChange={setStrategyDraft} />
+            )}
             <Button onClick={handleAdd} className="w-full" disabled={saving}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Add Payment Mode
