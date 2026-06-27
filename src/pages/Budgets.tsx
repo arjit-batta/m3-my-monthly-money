@@ -10,6 +10,7 @@ import { useBudgetData } from '@/hooks/useBudgetData';
 import { LoadingState, ErrorState, EmptyState } from '@/components/LoadingError';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SubscriptionsView } from '@/pages/Subscriptions';
+import { TransactionsView } from '@/components/TransactionsView';
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-IN', {
@@ -100,8 +101,9 @@ export default function Budgets() {
         </div>
 
         <Tabs defaultValue="budgets" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="budgets">Budgets</TabsTrigger>
+            <TabsTrigger value="transactions">Transactions</TabsTrigger>
             <TabsTrigger value="subs">Subs</TabsTrigger>
           </TabsList>
 
@@ -186,6 +188,10 @@ export default function Budgets() {
             )}
           </>
         )}
+          </TabsContent>
+
+          <TabsContent value="transactions" className="mt-4">
+            <TransactionsView />
           </TabsContent>
 
           <TabsContent value="subs" className="mt-4">
