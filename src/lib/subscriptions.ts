@@ -1,7 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 
 export type SubscriptionCadence = 'monthly' | 'quarterly' | 'annual';
-export type SubscriptionSource = 'card' | 'upi' | 'app_store' | 'web';
+export type SubscriptionSource = string;
 export type SubscriptionStatus = 'active' | 'paused' | 'cancelled';
 
 export interface Subscription {

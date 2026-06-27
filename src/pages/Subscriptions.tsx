@@ -55,12 +55,16 @@ const CADENCE_LABEL: Record<SubscriptionCadence, string> = {
   annual: 'Annual',
 };
 
-const SOURCE_LABEL: Record<SubscriptionSource, string> = {
-  card: 'Card',
-  upi: 'UPI',
-  app_store: 'App Store',
-  web: 'Web',
-};
+const SOURCE_OPTIONS: { value: string; label: string }[] = [
+  { value: 'app_store', label: 'App Store (Apple)' },
+  { value: 'play_store', label: 'Play Store (Google)' },
+  { value: 'upi_autopay', label: 'UPI Autopay' },
+  { value: 'card_mandate', label: 'Card / bank mandate' },
+  { value: 'provider', label: 'Provider app or website' },
+  { value: 'other', label: 'Other' },
+];
+const SOURCE_KEYS = new Set(SOURCE_OPTIONS.map((o) => o.value));
+const OTHER_VALUE = 'other';
 
 const STATUS_LABEL: Record<SubscriptionStatus, string> = {
   active: 'Active',
@@ -89,6 +93,7 @@ export default function SubscriptionsPage() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<SubscriptionInput>(emptyForm);
+  const [otherSource, setOtherSource] = useState('');
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
@@ -123,11 +128,13 @@ export default function SubscriptionsPage() {
   const openAdd = () => {
     setEditingId(null);
     setForm({ ...emptyForm, nextRenewalDate: format(new Date(), 'yyyy-MM-dd') });
+    setOtherSource('');
     setSheetOpen(true);
   };
 
   const openEdit = (sub: Subscription) => {
     setEditingId(sub.id);
+    const isKnown = SOURCE_KEYS.has(sub.source);
     setForm({
       name: sub.name,
       amount: sub.amount,
@@ -135,9 +142,10 @@ export default function SubscriptionsPage() {
       nextRenewalDate: sub.nextRenewalDate,
       paymentModeId: sub.paymentModeId,
       categoryId: sub.categoryId,
-      source: sub.source,
+      source: isKnown ? sub.source : OTHER_VALUE,
       status: sub.status,
     });
+    setOtherSource(isKnown ? '' : (sub.source || ''));
     setSheetOpen(true);
   };
 
@@ -160,11 +168,15 @@ export default function SubscriptionsPage() {
     }
     setSaving(true);
     try {
+      const payload: SubscriptionInput = {
+        ...form,
+        source: form.source === OTHER_VALUE ? otherSource.trim() : form.source,
+      };
       if (editingId) {
-        await updateSubscription(editingId, form);
+        await updateSubscription(editingId, payload);
         toast({ title: 'Subscription updated' });
       } else {
-        await addSubscription(form);
+        await addSubscription(payload);
         toast({ title: 'Subscription added' });
       }
       setSheetOpen(false);
@@ -379,16 +391,23 @@ export default function SubscriptionsPage() {
             <div className="space-y-1.5">
               <Label>Manage / cancel via (optional)</Label>
               <Select
-                value={form.source}
-                onValueChange={(v) => setForm({ ...form, source: v as SubscriptionSource })}
+                value={form.source || ''}
+                onValueChange={(v) => setForm({ ...form, source: v })}
               >
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                 <SelectContent>
-                  {(Object.keys(SOURCE_LABEL) as SubscriptionSource[]).map((s) => (
-                    <SelectItem key={s} value={s}>{SOURCE_LABEL[s]}</SelectItem>
+                  {SOURCE_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {form.source === OTHER_VALUE && (
+                <Input
+                  value={otherSource}
+                  onChange={(e) => setOtherSource(e.target.value)}
+                  placeholder="e.g. Email support, dealer, etc."
+                />
+              )}
               <p className="text-xs text-muted-foreground">
                 Where you go to change or cancel this — e.g. App Store, Play Store, UPI Autopay, or the provider's website.
               </p>
