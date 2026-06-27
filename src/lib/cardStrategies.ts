@@ -69,5 +69,4 @@ export const SUGGESTED_CARD_TAGS = [
   'vouchers',
   'lounge',
   'fuel',
-  'keep-alive',
 ];
