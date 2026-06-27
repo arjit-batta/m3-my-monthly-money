@@ -154,6 +154,10 @@ export default function SubscriptionsPage() {
       toast({ title: 'Next renewal date is required', variant: 'destructive' });
       return;
     }
+    if (!form.paymentModeId) {
+      toast({ title: '"Paid with" is required', variant: 'destructive' });
+      return;
+    }
     setSaving(true);
     try {
       if (editingId) {
