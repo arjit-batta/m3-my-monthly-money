@@ -51,12 +51,12 @@ export async function upsertCardStrategy(
       {
         user_id: userId,
         payment_mode_id: paymentModeId,
-        tags: input.tags,
+        tags: Array.from(input.tags ?? []).map((t) => String(t)),
         keep_alive: input.keepAlive,
         keep_alive_cadence_days: input.keepAliveCadenceDays,
         note: input.note,
       },
-      { onConflict: 'payment_mode_id' },
+      { onConflict: 'user_id,payment_mode_id' },
     );
   if (error) throw error;
 }
