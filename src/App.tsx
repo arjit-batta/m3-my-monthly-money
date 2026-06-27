@@ -10,6 +10,9 @@ import Subscriptions from "./pages/Subscriptions";
 import Strategy from "./pages/Strategy";
 import Analytics from "./pages/Analytics";
 import SettingsPage from "./pages/SettingsPage";
+import Account from "./pages/Account";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import Terms from "./pages/Terms";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import { RenewalPrompts } from "@/components/RenewalPrompts";
@@ -69,6 +72,9 @@ const App = () => (
             <Route path="/strategy" element={<ProtectedRoute><Strategy /></ProtectedRoute>} />
             <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+            <Route path="/account" element={<ProtectedRoute><Account /></ProtectedRoute>} />
+            <Route path="/privacy" element={<ProtectedRoute><PrivacyPolicy /></ProtectedRoute>} />
+            <Route path="/terms" element={<ProtectedRoute><Terms /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
