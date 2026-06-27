@@ -284,7 +284,8 @@ export type Database = {
           name: string
           next_renewal_date: string
           payment_mode_id: string | null
-          source: string
+          source: string | null
+          source_other: string | null
           status: string
           updated_at: string
           user_id: string
@@ -298,7 +299,8 @@ export type Database = {
           name: string
           next_renewal_date: string
           payment_mode_id?: string | null
-          source: string
+          source?: string | null
+          source_other?: string | null
           status?: string
           updated_at?: string
           user_id: string
@@ -312,7 +314,8 @@ export type Database = {
           name?: string
           next_renewal_date?: string
           payment_mode_id?: string | null
-          source?: string
+          source?: string | null
+          source_other?: string | null
           status?: string
           updated_at?: string
           user_id?: string
