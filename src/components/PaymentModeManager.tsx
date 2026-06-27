@@ -12,6 +12,7 @@ import { PaymentMode, PaymentModeType, Expense } from '@/types/expense';
 import { toast } from '@/hooks/use-toast';
 import { LoadingState, ErrorState } from '@/components/LoadingError';
 import { withErrorHandling } from '@/lib/db-utils';
+import { CardStrategyEditor } from '@/components/CardStrategyEditor';
 
 const PAYMENT_MODE_TYPES: { value: PaymentModeType; label: string }[] = [
   { value: 'credit_card', label: 'Credit Card' },
@@ -289,7 +290,7 @@ export function PaymentModeManager() {
 
       {/* Edit Sheet */}
       <Sheet open={isEditSheetOpen} onOpenChange={setIsEditSheetOpen}>
-        <SheetContent side="bottom" className="h-auto">
+        <SheetContent side="bottom" className="max-h-[90vh] overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Edit Payment Mode</SheetTitle>
           </SheetHeader>
@@ -321,6 +322,9 @@ export function PaymentModeManager() {
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Save Changes
             </Button>
+            {editingMode && type === 'credit_card' && (
+              <CardStrategyEditor paymentModeId={editingMode.id} />
+            )}
           </div>
         </SheetContent>
       </Sheet>
