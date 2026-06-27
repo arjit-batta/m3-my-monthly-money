@@ -154,6 +154,10 @@ export default function SubscriptionsPage() {
       toast({ title: 'Next renewal date is required', variant: 'destructive' });
       return;
     }
+    if (!form.paymentModeId) {
+      toast({ title: '"Paid with" is required', variant: 'destructive' });
+      return;
+    }
     setSaving(true);
     try {
       if (editingId) {
@@ -357,19 +361,37 @@ export default function SubscriptionsPage() {
             </div>
 
             <div className="space-y-1.5">
-              <Label>Payment mode (optional)</Label>
+              <Label>Paid with <span className="text-destructive">*</span></Label>
               <Select
-                value={form.paymentModeId ?? 'none'}
-                onValueChange={(v) => setForm({ ...form, paymentModeId: v === 'none' ? null : v })}
+                value={form.paymentModeId ?? ''}
+                onValueChange={(v) => setForm({ ...form, paymentModeId: v })}
               >
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Select a card / account" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
                   {paymentModes.map((pm) => (
                     <SelectItem key={pm.id} value={pm.id}>{pm.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">The card or account the money comes from.</p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Manage / cancel via (optional)</Label>
+              <Select
+                value={form.source}
+                onValueChange={(v) => setForm({ ...form, source: v as SubscriptionSource })}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(SOURCE_LABEL) as SubscriptionSource[]).map((s) => (
+                    <SelectItem key={s} value={s}>{SOURCE_LABEL[s]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Where you go to change or cancel this — e.g. App Store, Play Store, UPI Autopay, or the provider's website.
+              </p>
             </div>
 
             <div className="space-y-1.5">
@@ -388,35 +410,19 @@ export default function SubscriptionsPage() {
               </Select>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Source</Label>
-                <Select
-                  value={form.source}
-                  onValueChange={(v) => setForm({ ...form, source: v as SubscriptionSource })}
-                >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {(Object.keys(SOURCE_LABEL) as SubscriptionSource[]).map((s) => (
-                      <SelectItem key={s} value={s}>{SOURCE_LABEL[s]}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label>Status</Label>
-                <Select
-                  value={form.status}
-                  onValueChange={(v) => setForm({ ...form, status: v as SubscriptionStatus })}
-                >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {(Object.keys(STATUS_LABEL) as SubscriptionStatus[]).map((s) => (
-                      <SelectItem key={s} value={s}>{STATUS_LABEL[s]}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-1.5">
+              <Label>Status</Label>
+              <Select
+                value={form.status}
+                onValueChange={(v) => setForm({ ...form, status: v as SubscriptionStatus })}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(STATUS_LABEL) as SubscriptionStatus[]).map((s) => (
+                    <SelectItem key={s} value={s}>{STATUS_LABEL[s]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="flex gap-2 pt-2">
