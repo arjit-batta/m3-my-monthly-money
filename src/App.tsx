@@ -12,6 +12,7 @@ import Analytics from "./pages/Analytics";
 import SettingsPage from "./pages/SettingsPage";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import { RenewalPrompts } from "@/components/RenewalPrompts";
 
 // Export queryClient so it can be cleared on logout
 export const queryClient = new QueryClient();
@@ -59,6 +60,7 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <RenewalPrompts />
           <Routes>
             <Route path="/auth" element={<AuthRoute><Auth /></AuthRoute>} />
             <Route path="/" element={<ProtectedRoute><AddExpense /></ProtectedRoute>} />
