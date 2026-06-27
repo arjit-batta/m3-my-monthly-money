@@ -42,10 +42,25 @@ function saveLastUsedValues(categoryId: string, paymentModeId: string) {
   localStorage.setItem(STORAGE_KEYS.LAST_PAYMENT_MODE, paymentModeId);
 }
 
-export function ExpenseForm() {
+export interface ExpenseFormInitialValues {
+  amount?: number;
+  date?: Date;
+  categoryId?: string;
+  subCategoryId?: string;
+  paymentModeId?: string;
+  notes?: string;
+}
+
+interface ExpenseFormProps {
+  initialValues?: ExpenseFormInitialValues;
+  onSaved?: () => void;
+}
+
+export function ExpenseForm({ initialValues, onSaved }: ExpenseFormProps = {}) {
   const { toast } = useToast();
   const amountInputRef = useRef<HTMLInputElement>(null);
   const lastUsed = getLastUsedValues();
+  const hasInitial = !!initialValues;
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [paymentModes, setPaymentModes] = useState<PaymentMode[]>([]);
@@ -53,16 +68,24 @@ export function ExpenseForm() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const [amount, setAmount] = useState('');
+  const [amount, setAmount] = useState(
+    initialValues?.amount != null ? String(initialValues.amount) : ''
+  );
   const [amountTouched, setAmountTouched] = useState(false);
-  const [date, setDate] = useState<Date>(new Date());
-  const [categoryId, setCategoryId] = useState(lastUsed.categoryId);
+  const [date, setDate] = useState<Date>(initialValues?.date ?? new Date());
+  const [categoryId, setCategoryId] = useState(
+    initialValues?.categoryId ?? lastUsed.categoryId
+  );
   const [categoryTouched, setCategoryTouched] = useState(false);
-  const [subCategoryId, setSubCategoryId] = useState('');
+  const [subCategoryId, setSubCategoryId] = useState(
+    initialValues?.subCategoryId ?? ''
+  );
   const [subCategoryTouched, setSubCategoryTouched] = useState(false);
-  const [paymentModeId, setPaymentModeId] = useState(lastUsed.paymentModeId);
+  const [paymentModeId, setPaymentModeId] = useState(
+    initialValues?.paymentModeId ?? lastUsed.paymentModeId
+  );
   const [paymentModeTouched, setPaymentModeTouched] = useState(false);
-  const [notes, setNotes] = useState('');
+  const [notes, setNotes] = useState(initialValues?.notes ?? '');
 
   // Load data on mount
   const loadData = async () => {
@@ -147,13 +170,20 @@ export function ExpenseForm() {
     setSubmitting(false);
 
     if (result.success === true) {
-      saveLastUsedValues(categoryId, paymentModeId);
+      if (!hasInitial) {
+        saveLastUsedValues(categoryId, paymentModeId);
+      }
 
       toast({
         title: 'Expense saved',
         description: `₹${amount} added`,
         duration: 2000,
       });
+
+      if (onSaved) {
+        onSaved();
+        return;
+      }
 
       // Reset form but keep category and payment mode
       setAmount('');
