@@ -1,7 +1,9 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
-import { Loader2, LogOut, Download } from 'lucide-react';
+import { Loader2, Download } from 'lucide-react';
 import { AppLayout } from '@/components/AppLayout';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -13,10 +15,13 @@ import { toast } from '@/hooks/use-toast';
 import { CategoryManager } from '@/components/CategoryManager';
 import { PaymentModeManager } from '@/components/PaymentModeManager';
 import { useAuth } from '@/hooks/useAuth';
+import { getMyProfile } from '@/lib/profile';
 import { LoadingState, ErrorState } from '@/components/LoadingError';
 
 export default function SettingsPage() {
-  const { signOut, user } = useAuth();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [isPremium, setIsPremium] = useState(false);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [paymentModes, setPaymentModes] = useState<PaymentMode[]>([]);
@@ -51,6 +56,10 @@ export default function SettingsPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    getMyProfile().then((p) => setIsPremium(!!p?.isPremium)).catch(() => {});
+  }, []);
 
   const categoryMap = useMemo(() => {
     const map: Record<string, Category> = {};
@@ -288,10 +297,6 @@ export default function SettingsPage() {
     }
   };
 
-  const handleSignOut = async () => {
-    await signOut();
-  };
-
   if (loading) {
     return (
       <AppLayout>
@@ -314,23 +319,29 @@ export default function SettingsPage() {
   return (
     <AppLayout>
       <div className="space-y-4 pb-6">
-        <div className="pt-6 flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-semibold">Settings</h1>
-              <span className="px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide rounded bg-muted text-muted-foreground">
-                Beta
-              </span>
-            </div>
-            {user?.email && (
-              <p className="text-sm text-muted-foreground">{user.email}</p>
-            )}
-          </div>
-          <Button variant="outline" size="sm" onClick={handleSignOut}>
-            <LogOut className="mr-2 h-4 w-4" />
-            Sign Out
-          </Button>
+        <div className="pt-6 flex items-center gap-2">
+          <h1 className="text-xl font-semibold">Settings</h1>
+          <span className="px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide rounded bg-muted text-muted-foreground">
+            Beta
+          </span>
         </div>
+
+        <button
+          onClick={() => navigate('/account')}
+          className="w-full flex items-center gap-3 p-3 rounded-lg border bg-card text-left active:bg-muted/60 transition-colors"
+          aria-label="Open account"
+        >
+          <Avatar className="h-10 w-10">
+            <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
+              {(user?.email?.[0] || '?').toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium truncate">{user?.email || 'Account'}</p>
+            <p className="text-xs text-muted-foreground">{isPremium ? 'Premium' : 'Free plan'}</p>
+          </div>
+          <span className="text-muted-foreground text-lg leading-none">›</span>
+        </button>
 
         <Tabs defaultValue="categories" className="w-full pt-2">
           <TabsList className="grid w-full grid-cols-3 gap-1">
