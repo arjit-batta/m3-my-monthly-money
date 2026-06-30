@@ -1,5 +1,6 @@
 import { AppLayout } from '@/components/AppLayout';
 import { ExpenseForm } from '@/components/ExpenseForm';
+import { VoiceExpenseCapture } from '@/components/VoiceExpenseCapture';
 
 export default function AddExpense() {
   return (
@@ -7,6 +8,9 @@ export default function AddExpense() {
       <div className="py-6">
         <h1 className="text-2xl font-semibold">Add Expense</h1>
         <p className="mt-1 text-sm text-muted-foreground">Record a new transaction</p>
+      </div>
+      <div className="mb-6">
+        <VoiceExpenseCapture />
       </div>
       <ExpenseForm />
     </AppLayout>
