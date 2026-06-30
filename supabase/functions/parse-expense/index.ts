@@ -152,7 +152,20 @@ Deno.serve(async (req) => {
         return json({ error: "AI credits exhausted. Please add credits to continue." }, 402);
       }
       console.error("AI gateway error", aiResp.status, txt);
-      return json({ error: "AI failed to parse the transcript." }, 502);
+      let upstream = txt;
+      try {
+        const parsedTxt = JSON.parse(txt);
+        upstream = parsedTxt?.message || parsedTxt?.error?.message || parsedTxt?.error || txt;
+      } catch {
+        // not JSON, use raw text
+      }
+      return json(
+        {
+          error: `AI gateway error ${aiResp.status}: ${upstream || "unknown error"}`,
+          upstream_status: aiResp.status,
+        },
+        502,
+      );
     }
 
     const aiJson = await aiResp.json();
