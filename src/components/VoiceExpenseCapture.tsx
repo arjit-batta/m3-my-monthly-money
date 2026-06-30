@@ -15,6 +15,7 @@ import {
   ExpenseForm,
   type ExpenseFormInitialValues,
 } from '@/components/ExpenseForm';
+import { VoiceBatchReview, type BatchEntryInput } from '@/components/VoiceBatchReview';
 
 type ParsedEntry = {
   amount: number;
@@ -54,6 +55,7 @@ export function VoiceExpenseCapture({ onSaved }: { onSaved?: () => void } = {}) 
     keyword: string;
     matchedBy: 'mapping' | 'ai';
   } | null>(null);
+  const [batch, setBatch] = useState<BatchEntryInput[] | null>(null);
 
   const handleTranscript = useCallback(async (transcript: string) => {
     const text = transcript.trim();
@@ -95,11 +97,7 @@ export function VoiceExpenseCapture({ onSaved }: { onSaved?: () => void } = {}) 
       }
 
       if (entries.length > 1) {
-        toast({
-          title: 'Multiple expenses detected',
-          description:
-            'Batch entry is coming soon — please say one expense at a time for now.',
-        });
+        setBatch(entries);
         return;
       }
 
@@ -293,6 +291,17 @@ export function VoiceExpenseCapture({ onSaved }: { onSaved?: () => void } = {}) 
           )}
         </SheetContent>
       </Sheet>
+
+      <VoiceBatchReview
+        open={!!batch}
+        entries={batch ?? []}
+        onOpenChange={(open) => {
+          if (!open) setBatch(null);
+        }}
+        onSavedAll={() => {
+          onSaved?.();
+        }}
+      />
     </>
   );
 }
