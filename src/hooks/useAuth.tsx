@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { queryClient } from '@/App';
 import { clearInMemoryCaches } from '@/lib/database';
 import { identifyUser, resetAnalytics } from '@/lib/analytics';
+import { setSentryUser } from '@/lib/sentry';
 
 interface AuthContextType {
   user: User | null;
@@ -30,6 +31,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLoading(false);
         if (session?.user) {
           identifyUser(session.user.id);
+          setSentryUser(session.user.id);
+        } else {
+          setSentryUser(null);
         }
       }
     );
@@ -41,6 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
       if (session?.user) {
         identifyUser(session.user.id);
+        setSentryUser(session.user.id);
       }
     });
 
@@ -74,6 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearInMemoryCaches();
     
     resetAnalytics();
+    setSentryUser(null);
 
     // Sign out from Supabase (clears localStorage session)
     await supabase.auth.signOut();
