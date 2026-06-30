@@ -69,12 +69,9 @@ export function initSentry() {
       return event;
     },
   });
-  Sentry.setTag('release', APP_RELEASE);
   initialized = true;
-
-  // One-off connection test event — remove once verified.
-  Sentry.captureMessage('sentry-setup-test');
 }
+
 
 export function setSentryUser(userId: string | null) {
   if (!initialized) return;
