@@ -31,6 +31,7 @@ import {
   ExpenseForm,
   type ExpenseFormInitialValues,
 } from '@/components/ExpenseForm';
+import { track } from '@/lib/analytics';
 
 export function RenewalPrompts() {
   const { user, loading } = useAuth();
@@ -64,6 +65,7 @@ export function RenewalPrompts() {
   useEffect(() => {
     if (!current && queue.length > 0) {
       setCurrent(queue[0]);
+      track('renewal_prompt_shown');
     }
   }, [queue, current]);
 
@@ -113,6 +115,7 @@ export function RenewalPrompts() {
     setBusy(true);
     try {
       await dismissRenewal(current);
+      track('renewal_skipped');
       queryClient.invalidateQueries();
       advance();
     } catch (err) {
@@ -131,6 +134,7 @@ export function RenewalPrompts() {
     if (!editing) return;
     try {
       await advanceSubscription(editing.sub);
+      track('renewal_logged');
     } catch (err) {
       console.error('Failed to advance subscription after save', err);
     }

@@ -13,6 +13,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { getMyProfile } from '@/lib/profile';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { track } from '@/lib/analytics';
 
 const SUPPORT_EMAIL = 'support@placeholder.com'; // PLACEHOLDER — update later
 
@@ -43,6 +44,7 @@ export default function Account() {
       await supabase.from('categories').delete().eq('user_id', uid);
       await supabase.from('payment_modes').delete().eq('user_id', uid);
       await supabase.from('profiles').delete().eq('id', uid);
+      track('account_deleted');
       toast({ title: 'Your data has been deleted' });
       await signOut();
     } catch (err) {

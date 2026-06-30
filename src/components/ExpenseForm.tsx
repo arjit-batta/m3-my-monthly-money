@@ -24,6 +24,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Category, PaymentMode } from '@/types/expense';
 import { LoadingState, ErrorState } from '@/components/LoadingError';
 import { withErrorHandling, getErrorMessage, isNetworkError } from '@/lib/db-utils';
+import { track } from '@/lib/analytics';
 
 const STORAGE_KEYS = {
   LAST_CATEGORY: 'expense-last-category',
@@ -170,6 +171,7 @@ export function ExpenseForm({ initialValues, onSaved }: ExpenseFormProps = {}) {
     setSubmitting(false);
 
     if (result.success === true) {
+      track('expense_added', { capture_method: 'manual' });
       if (!hasInitial) {
         saveLastUsedValues(categoryId, paymentModeId);
       }
