@@ -54,10 +54,17 @@ export interface ExpenseFormInitialValues {
 
 interface ExpenseFormProps {
   initialValues?: ExpenseFormInitialValues;
-  onSaved?: () => void;
+  onSaved?: (saved: {
+    amount: number;
+    categoryId: string;
+    subCategoryId: string;
+    paymentModeId: string;
+    notes?: string;
+  }) => void;
+  captureMethod?: 'manual' | 'voice' | 'batch_voice' | 'widget' | 'renewal_log';
 }
 
-export function ExpenseForm({ initialValues, onSaved }: ExpenseFormProps = {}) {
+export function ExpenseForm({ initialValues, onSaved, captureMethod = 'manual' }: ExpenseFormProps = {}) {
   const { toast } = useToast();
   const amountInputRef = useRef<HTMLInputElement>(null);
   const lastUsed = getLastUsedValues();
@@ -171,7 +178,7 @@ export function ExpenseForm({ initialValues, onSaved }: ExpenseFormProps = {}) {
     setSubmitting(false);
 
     if (result.success === true) {
-      track('expense_added', { capture_method: 'manual' });
+      track('expense_added', { capture_method: captureMethod });
       if (!hasInitial) {
         saveLastUsedValues(categoryId, paymentModeId);
       }
@@ -183,7 +190,13 @@ export function ExpenseForm({ initialValues, onSaved }: ExpenseFormProps = {}) {
       });
 
       if (onSaved) {
-        onSaved();
+        onSaved({
+          amount: expenseData.amount,
+          categoryId: expenseData.categoryId,
+          subCategoryId: expenseData.subCategoryId,
+          paymentModeId: expenseData.paymentModeId,
+          notes: expenseData.notes,
+        });
         return;
       }
 
