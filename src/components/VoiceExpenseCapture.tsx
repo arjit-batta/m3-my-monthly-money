@@ -75,10 +75,23 @@ export function VoiceExpenseCapture({ onSaved }: { onSaved?: () => void } = {}) 
       });
 
       if (error) {
-        const msg =
+        let msg =
           (data as any)?.error ||
           (error as any)?.message ||
           'Could not reach the parser. Check your connection and try again.';
+        // FunctionsHttpError carries the actual response body — read it for the real reason.
+        try {
+          const ctx = (error as any)?.context;
+          if (ctx && typeof ctx.json === 'function') {
+            const body = await ctx.json();
+            if (body?.error) msg = body.error;
+          } else if (ctx && typeof ctx.text === 'function') {
+            const body = await ctx.text();
+            if (body) msg = body;
+          }
+        } catch {
+          // ignore – keep fallback message
+        }
         toast({ title: 'Voice parsing failed', description: msg, variant: 'destructive' });
         return;
       }
