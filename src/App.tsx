@@ -2,7 +2,9 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { useEffect } from "react";
+import { setSentryRoute } from "@/lib/sentry";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import AddExpense from "./pages/AddExpense";
 import Budgets from "./pages/Budgets";
@@ -18,6 +20,14 @@ import ResetPassword from "./pages/ResetPassword";
 import ChangePassword from "./pages/ChangePassword";
 import NotFound from "./pages/NotFound";
 import { RenewalPrompts } from "@/components/RenewalPrompts";
+
+function RouteTagger() {
+  const location = useLocation();
+  useEffect(() => {
+    setSentryRoute(location.pathname);
+  }, [location.pathname]);
+  return null;
+}
 
 // Export queryClient so it can be cleared on logout
 export const queryClient = new QueryClient();
@@ -65,6 +75,7 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <RouteTagger />
           <RenewalPrompts />
           <Routes>
             <Route path="/auth" element={<AuthRoute><Auth /></AuthRoute>} />
