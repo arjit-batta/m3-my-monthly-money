@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, IndianRupee, Eye, EyeOff } from 'lucide-react';
+import { track } from '@/lib/analytics';
 
 export default function Auth() {
   const [email, setEmail] = useState('');
@@ -32,6 +33,8 @@ export default function Auth() {
         description: error.message,
         variant: 'destructive',
       });
+    } else {
+      track('sign_in', { method: 'email' });
     }
   };
 
@@ -56,6 +59,7 @@ export default function Auth() {
         variant: 'destructive',
       });
     } else {
+      track('sign_up', { method: 'email' });
       toast({
         title: 'Account created!',
         description: 'You are now signed in.',
@@ -65,6 +69,7 @@ export default function Auth() {
 
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
+    track('sign_in', { method: 'google' });
     const result = await lovable.auth.signInWithOAuth('google', {
       redirect_uri: window.location.origin,
     });

@@ -15,6 +15,7 @@ import {
   totalMonthlyBurn,
 } from '@/lib/subscriptions';
 import { getMyProfile } from '@/lib/profile';
+import { track } from '@/lib/analytics';
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-IN', {
@@ -60,9 +61,11 @@ export function StrategyView() {
         if (cancelled) return;
         setIsPremium(premium);
         if (!premium) {
+          track('paywall_viewed', { surface: 'strategy' });
           setLoading(false);
           return;
         }
+        track('strategy_viewed');
         const [m, s, e, sub] = await Promise.all([
           getPaymentModes(),
           getAllCardStrategies(),

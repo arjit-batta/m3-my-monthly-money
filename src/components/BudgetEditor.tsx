@@ -21,6 +21,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Category } from '@/types/expense';
 import { LoadingState, ErrorState } from '@/components/LoadingError';
 import { withErrorHandling } from '@/lib/db-utils';
+import { track } from '@/lib/analytics';
 
 interface BudgetEditorProps {
   open: boolean;
@@ -108,6 +109,9 @@ export function BudgetEditor({
     setSaving(false);
 
     if (result.success === true) {
+      if (parseFloat(amount) > 0 && !isEditing) {
+        track('budget_created');
+      }
       toast({ title: 'Budget saved', duration: 2000 });
       onOpenChange(false);
       onSave?.();

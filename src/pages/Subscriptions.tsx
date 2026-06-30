@@ -39,6 +39,7 @@ import {
   totalMonthlyBurn,
   updateSubscription,
 } from '@/lib/subscriptions';
+import { track } from '@/lib/analytics';
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-IN', {
@@ -179,6 +180,7 @@ export function SubscriptionsView() {
         toast({ title: 'Subscription updated' });
       } else {
         await addSubscription(payload);
+        track('subscription_added');
         toast({ title: 'Subscription added' });
       }
       setSheetOpen(false);

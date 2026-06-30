@@ -3,6 +3,7 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { queryClient } from '@/App';
 import { clearInMemoryCaches } from '@/lib/database';
+import { identifyUser, resetAnalytics } from '@/lib/analytics';
 
 interface AuthContextType {
   user: User | null;
@@ -27,6 +28,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+        if (session?.user) {
+          identifyUser(session.user.id);
+        }
       }
     );
 
@@ -35,6 +39,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+      if (session?.user) {
+        identifyUser(session.user.id);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -66,6 +73,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Clear in-memory caches (initialization locks, etc.)
     clearInMemoryCaches();
     
+    resetAnalytics();
+
     // Sign out from Supabase (clears localStorage session)
     await supabase.auth.signOut();
   };
